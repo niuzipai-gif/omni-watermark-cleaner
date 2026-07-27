@@ -5,6 +5,7 @@ import path from 'node:path';
 import { removeWatermarkFromBuffer } from '@pilio/gemini-watermark-remover/node';
 import sharp from 'sharp';
 
+import { repairVisibleResidual, type RawImageData, type WatermarkRegion } from './imageResidualRepair';
 import type { RemovalResult } from './removalRunner';
 
 export interface ImageRemovalRequest {
@@ -15,12 +16,18 @@ export interface ImageRemovalRequest {
 export interface ImageRemovalMeta {
   applied: boolean;
   skipReason?: string | null;
-  position?: { x: number; y: number } | null;
+  position?: WatermarkRegion | null;
+  detection?: {
+    residualVisibility?: {
+      visible?: boolean;
+    } | null;
+  } | null;
 }
 
 export interface ImageEngineResult {
   buffer: Buffer;
   meta: ImageRemovalMeta;
+  imageData?: RawImageData;
 }
 
 export interface ImageRemovalDependencies {
@@ -29,6 +36,7 @@ export interface ImageRemovalDependencies {
   removeFile: (filePath: string, options: { force: true }) => Promise<void>;
   exists: (filePath: string) => boolean;
   remove: (input: Buffer, request: ImageRemovalRequest) => Promise<ImageEngineResult>;
+  repair?: (processed: ImageEngineResult, request: ImageRemovalRequest) => Promise<Buffer | null>;
 }
 
 const defaultDependencies: ImageRemovalDependencies = {
@@ -36,7 +44,8 @@ const defaultDependencies: ImageRemovalDependencies = {
   writeFile,
   removeFile: rm,
   exists: existsSync,
-  remove: removeGeminiWatermark
+  remove: removeGeminiWatermark,
+  repair: repairGeminiResidual
 };
 
 export async function runImageWatermarkRemoval(
@@ -50,8 +59,18 @@ export async function runImageWatermarkRemoval(
     if (!processed.meta.applied) {
       throw new Error(`Gemini watermark was not safely detected: ${processed.meta.skipReason ?? 'unknown reason'}`);
     }
+    let outputBuffer = processed.buffer;
+    let meta: ImageRemovalMeta & { repair?: 'matched-patch' } = processed.meta;
+    if (processed.meta.detection?.residualVisibility?.visible) {
+      const repaired = await (dependencies.repair ?? repairGeminiResidual)(processed, request);
+      if (!repaired) {
+        throw new Error('Gemini watermark could not be fully removed without visible residuals.');
+      }
+      outputBuffer = repaired;
+      meta = { ...processed.meta, repair: 'matched-patch' };
+    }
 
-    await dependencies.writeFile(request.outputPath, processed.buffer);
+    await dependencies.writeFile(request.outputPath, outputBuffer);
     if (!dependencies.exists(request.outputPath)) {
       throw new Error('Image cleanup did not create an output file.');
     }
@@ -60,7 +79,7 @@ export async function runImageWatermarkRemoval(
       input: request.inputPath,
       output: request.outputPath,
       kind: 'image',
-      meta: { ...processed.meta }
+      meta: { ...meta }
     };
   } catch (error) {
     await dependencies.removeFile(request.outputPath, { force: true }).catch(() => undefined);
@@ -80,34 +99,43 @@ async function removeGeminiWatermark(input: Buffer, request: ImageRemovalRequest
         data: Uint8ClampedArray.from(data)
       };
     },
-    encodeImageData: async (imageData) => {
-      let encoder = sharp(Buffer.from(imageData.data), {
-        raw: {
-          width: imageData.width,
-          height: imageData.height,
-          channels: 4
-        }
-      });
-
-      switch (getOutputFormat(request.outputPath)) {
-        case 'jpeg':
-          encoder = encoder.jpeg({ quality: 95 });
-          break;
-        case 'webp':
-          encoder = encoder.webp({ quality: 95 });
-          break;
-        default:
-          encoder = encoder.png();
-      }
-
-      return encoder.toBuffer();
-    }
+    encodeImageData: (imageData) => encodeImageData(imageData, request.outputPath)
   });
 
   return {
     buffer: result.buffer,
-    meta: result.meta as ImageRemovalMeta
+    meta: result.meta as ImageRemovalMeta,
+    imageData: result.imageData
   };
+}
+
+async function repairGeminiResidual(processed: ImageEngineResult, request: ImageRemovalRequest): Promise<Buffer | null> {
+  const repaired = repairVisibleResidual(processed.imageData, processed.meta.position);
+  if (!repaired) return null;
+  return encodeImageData(repaired, request.outputPath);
+}
+
+function encodeImageData(imageData: RawImageData, outputPath: string): Promise<Buffer> {
+  let encoder = sharp(Buffer.from(imageData.data), {
+    raw: {
+      width: imageData.width,
+      height: imageData.height,
+      channels: 4
+    }
+  });
+
+  switch (getOutputFormat(outputPath)) {
+    case 'jpeg':
+      encoder = encoder.jpeg({ quality: 95 });
+      break;
+    case 'webp':
+      encoder = encoder.webp({ quality: 95 });
+      break;
+    default:
+      encoder = encoder.png();
+  }
+
+  return encoder.toBuffer();
 }
 
 function getOutputFormat(filePath: string): 'jpeg' | 'png' | 'webp' {

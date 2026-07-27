@@ -22,7 +22,7 @@ To create a desktop shortcut on a new PC, run `Create Desktop Shortcut.cmd` from
 ## Processing Behavior
 
 - Gemini image cleanup runs locally with a reverse alpha-blend remover. It does not upload image files to a server, does not crop the image, and does not add blur or mosaic blocks.
-- If the local image remover cannot verify a safe cleanup, it fails without keeping a partial output file.
+- If a detectable residual remains, the app may use a nearby, border-matched texture patch only when the match is close enough. Otherwise it fails without keeping a partial output file.
 - The app reads video metadata with bundled Playwright Chromium.
 - All aspect ratios, including 16:9 and 9:16, try the configured public video cleanup page first.
 - The default page is `https://geminiwatermarkremover.io/video`.
@@ -106,7 +106,7 @@ npm run smoke:portable-landscape-fallback
 
 ## Limits
 
-- Image cleanup targets the supported visible Gemini corner mark, not invisible SynthID or arbitrary third-party watermarks.
+- Image cleanup targets the supported visible Gemini corner mark, not invisible SynthID or arbitrary third-party watermarks. Complex foreground behind a corner mark can be rejected when local cleanup cannot be verified without a visible artifact.
 - Video cleanup targets visible generated-video watermark overlays, not invisible SynthID.
 - The public cleanup page can change or become unavailable; configure another compatible page inside the app if needed.
 - Local fallback is ffmpeg region cleanup, not AI repainting.

@@ -8,6 +8,7 @@ $requiredFiles = @(
   (Join-Path $appRoot "Omni Watermark Cleaner.exe"),
   (Join-Path $appRoot "resources\app.asar"),
   (Join-Path $appRoot "resources\app.asar.unpacked\node_modules\ffmpeg-static\ffmpeg.exe"),
+  (Join-Path $appRoot "resources\app.asar.unpacked\node_modules\@img\sharp-win32-x64\lib\sharp-win32-x64.node"),
   (Join-Path $appRoot "resources\ms-playwright\chromium-1217\chrome-win64\chrome.exe"),
   (Join-Path $appRoot "resources\ms-playwright\chromium_headless_shell-1217\chrome-headless-shell-win64\chrome-headless-shell.exe"),
   (Join-Path $packageRoot "Start Omni Watermark Cleaner.cmd"),
@@ -28,6 +29,11 @@ if ($missing.Count -gt 0) {
 $ffmpeg = Get-Item -LiteralPath (Join-Path $appRoot "resources\app.asar.unpacked\node_modules\ffmpeg-static\ffmpeg.exe")
 if ($ffmpeg.Length -lt 50000000) {
   throw "ffmpeg-static looks too small: $($ffmpeg.Length) bytes"
+}
+
+$sharpNative = Get-Item -LiteralPath (Join-Path $appRoot "resources\app.asar.unpacked\node_modules\@img\sharp-win32-x64\lib\sharp-win32-x64.node")
+if ($sharpNative.Length -lt 100000) {
+  throw "sharp native module looks too small: $($sharpNative.Length) bytes"
 }
 
 $appAsar = Get-Item -LiteralPath (Join-Path $appRoot "resources\app.asar")
@@ -77,6 +83,7 @@ foreach ($relativePath in @(
   "app\Omni Watermark Cleaner.exe",
   "app\resources\app.asar",
   "app\resources\app.asar.unpacked\node_modules\ffmpeg-static\ffmpeg.exe",
+  "app\resources\app.asar.unpacked\node_modules\@img\sharp-win32-x64\lib\sharp-win32-x64.node",
   "app\resources\ms-playwright\chromium-1217\chrome-win64\chrome.exe",
   "app\resources\ms-playwright\chromium_headless_shell-1217\chrome-headless-shell-win64\chrome-headless-shell.exe"
 )) {
@@ -93,6 +100,7 @@ $count = (Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Measure-Objec
   FileCount = $count
   SizeMB = [math]::Round($size / 1MB, 2)
   FfmpegMB = [math]::Round($ffmpeg.Length / 1MB, 2)
+  SharpNativeMB = [math]::Round($sharpNative.Length / 1MB, 2)
   AppAsarMB = [math]::Round($appAsar.Length / 1MB, 2)
   AppAsarTime = $appAsar.LastWriteTime
   Status = "OK"

@@ -1,5 +1,5 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
-import { existsSync } from 'node:fs';
+import { appendFileSync, existsSync } from 'node:fs';
 import { mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,14 +12,26 @@ import { configureBundledPlaywrightBrowsers } from '../src/main/videoRuntime';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const isDev = Boolean(process.env.VITE_DEV_SERVER_URL);
 
+function traceStartup(message: string) {
+  const tracePath = process.env.OMNI_STARTUP_TRACE_PATH;
+  if (tracePath) {
+    appendFileSync(tracePath, `${new Date().toISOString()} ${message}\n`);
+  }
+}
+
+traceStartup('module-loaded');
+
 if (app.isPackaged) {
+  traceStartup('configure-playwright');
   configureBundledPlaywrightBrowsers(process.resourcesPath, existsSync);
 }
 
 let mainWindow: BrowserWindow | null = null;
 let settingsCache: AppSettings | null = null;
 
+traceStartup('resolve-default-output-directory');
 const defaultOutputDirectory = path.join(app.getPath('desktop'), 'Omni Watermark Cleaner Output');
+traceStartup('default-output-directory-ready');
 const settingsStore = createSettingsStore(path.join(resolveUserDataPath(), 'settings.json'), { defaultOutputDirectory });
 const processingQueue = new ProcessingQueue({ exists: existsSync });
 
@@ -28,6 +40,7 @@ processingQueue.on('task-updated', (task) => {
 });
 
 async function createWindow() {
+  traceStartup('create-window');
   mainWindow = new BrowserWindow({
     width: 1100,
     height: 760,
@@ -43,10 +56,13 @@ async function createWindow() {
   });
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
+    traceStartup('load-dev-url');
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   } else {
+    traceStartup('load-renderer-file');
     await mainWindow.loadFile(path.join(__dirname, '..', 'dist-renderer', 'index.html'));
+    traceStartup('renderer-file-loaded');
   }
 }
 
@@ -91,8 +107,10 @@ function registerIpcHandlers() {
 }
 
 app.whenReady().then(async () => {
+  traceStartup('app-ready');
   registerIpcHandlers();
   await createWindow();
+  traceStartup('window-ready');
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

@@ -44,4 +44,58 @@ describe('image watermark removal', () => {
 
     expect(removeFile).toHaveBeenCalledWith('D:/out/photo-clean.png', { force: true });
   });
+
+  it('removes a partial output when a visible residual cannot be repaired', async () => {
+    const removeFile = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      runImageWatermarkRemoval(
+        { inputPath: 'F:/in/photo.png', outputPath: 'D:/out/photo-clean.png' },
+        {
+          readFile: vi.fn().mockResolvedValue(Buffer.from('input')),
+          writeFile: vi.fn().mockResolvedValue(undefined),
+          exists: vi.fn().mockReturnValue(true),
+          removeFile,
+          remove: vi.fn().mockResolvedValue({
+            buffer: Buffer.from('partial'),
+            meta: {
+              applied: true,
+              detection: { residualVisibility: { visible: true } }
+            }
+          }),
+          repair: vi.fn().mockResolvedValue(null)
+        }
+      )
+    ).rejects.toThrow('could not be fully removed');
+
+    expect(removeFile).toHaveBeenCalledWith('D:/out/photo-clean.png', { force: true });
+  });
+
+  it('writes the matched-patch repair when the engine reports a visible residual', async () => {
+    const writeFile = vi.fn().mockResolvedValue(undefined);
+    const repair = vi.fn().mockResolvedValue(Buffer.from('repaired'));
+
+    const result = await runImageWatermarkRemoval(
+      { inputPath: 'F:/in/photo.png', outputPath: 'D:/out/photo-clean.png' },
+      {
+        readFile: vi.fn().mockResolvedValue(Buffer.from('input')),
+        writeFile,
+        exists: vi.fn().mockReturnValue(true),
+        removeFile: vi.fn().mockResolvedValue(undefined),
+        remove: vi.fn().mockResolvedValue({
+          buffer: Buffer.from('partial'),
+          meta: {
+            applied: true,
+            position: { x: 10, y: 20, width: 96, height: 96 },
+            detection: { residualVisibility: { visible: true } }
+          }
+        }),
+        repair
+      }
+    );
+
+    expect(repair).toHaveBeenCalledOnce();
+    expect(writeFile).toHaveBeenCalledWith('D:/out/photo-clean.png', Buffer.from('repaired'));
+    expect(result.meta).toMatchObject({ repair: 'matched-patch' });
+  });
 });
