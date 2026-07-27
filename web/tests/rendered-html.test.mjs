@@ -13,15 +13,16 @@ async function render() {
   );
 }
 
-test("server-renders the Omni image workbench", async () => {
+test("server-renders the Omni image and video workbench", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
 
   const html = await response.text();
   assert.match(html, /<title>Omni Image Cleaner<\/title>/i);
-  assert.match(html, /Gemini 图片清理工具/);
-  assert.match(html, /选择或拖入图片/);
+  assert.match(html, /Gemini 图片与视频清理工具/);
+  assert.match(html, /选择或拖入图片或视频/);
+  assert.match(html, /MP4、MOV、M4V、WEBM/);
   assert.match(html, /本地处理/);
   assert.match(html, /omni-tortoise-logo\.png/);
 });
