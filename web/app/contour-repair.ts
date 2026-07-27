@@ -14,6 +14,8 @@ export async function repairDarkOutline(
 ) {
   if (!position || position.width !== 96 || position.height !== 96) return false;
 
+  // The package intentionally exposes this repair helper as runtime JS only.
+  // @ts-expect-error The upstream package has no declaration for this internal module.
   const contourModule = await import("../node_modules/@pilio/gemini-watermark-remover/src/core/darkOutlineContourRepair.js") as ContourModule;
   let applied = false;
   for (let pass = 0; pass < 2; pass += 1) {

@@ -2,10 +2,11 @@
 
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
 import { repairDarkOutline } from "./contour-repair";
-import { repairVisibleResidual } from "./residual-repair";
+import { repairVisibleResidual, type RawImageData } from "./residual-repair";
 
 const ACCEPTED_IMAGE_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 const ACCEPTED_VIDEO_TYPES = new Set(["video/mp4", "video/quicktime", "video/webm", "video/x-m4v"]);
+const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
 
 type Phase = "idle" | "processing" | "ready" | "error";
 type FileKind = "image" | "video" | null;
@@ -74,14 +75,18 @@ export default function Home() {
       const { removeWatermarkFromImageData } = await import("@pilio/gemini-watermark-remover/image-data");
       const cleaned = await removeWatermarkFromImageData(context.getImageData(0, 0, canvas.width, canvas.height));
       if (!cleaned.meta.applied) throw new Error("未能确认这是可安全处理的 Gemini 图片。");
-      let output = cleaned.imageData;
+      let output: RawImageData | null = cleaned.imageData;
       if (cleaned.meta.detection?.residualVisibility?.visible) {
         const contourFixed = await repairDarkOutline(output, cleaned.meta.position);
-        output = repairVisibleResidual(output, cleaned.meta.position) ?? (contourFixed ? output : null);
+        const repaired = repairVisibleResidual(output, cleaned.meta.position);
+        if (repaired) output = repaired;
+        else if (!contourFixed) output = null;
       }
       if (!output) throw new Error("这张图片的背景过于复杂，网页版不会导出可能带残影的结果。请改用桌面版。");
 
-      context.putImageData(new ImageData(output.data, output.width, output.height), 0, 0);
+      const pixels = new Uint8ClampedArray(new ArrayBuffer(output.data.byteLength));
+      pixels.set(output.data);
+      context.putImageData(new ImageData(pixels, output.width, output.height), 0, 0);
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("浏览器无法生成结果图片。");
       setResultUrl(URL.createObjectURL(blob));
@@ -113,11 +118,11 @@ export default function Home() {
     const input = frameWindow?.document.getElementById("fileInput") as HTMLInputElement | null;
     if (!input || !frameWindow) return;
     const bytes = await videoFile.arrayBuffer();
-    const frameFile = new frameWindow.File([bytes], videoFile.name, {
+    const frameFile = new File([bytes], videoFile.name, {
       type: videoFile.type,
       lastModified: videoFile.lastModified,
     });
-    const transfer = new frameWindow.DataTransfer();
+    const transfer = new DataTransfer();
     transfer.items.add(frameFile);
     input.files = transfer.files;
     input.dispatchEvent(new Event("change", { bubbles: true }));
@@ -142,7 +147,7 @@ export default function Home() {
     <main className="shell">
       <header className="topbar">
         <a className="brand" href="#top" aria-label="Omni Image Cleaner 首页">
-          <img src="/omni-tortoise-logo.png" alt="Omni Image Cleaner 标志" />
+          <img src={`${basePath}/omni-tortoise-logo.png`} alt="Omni Image Cleaner 标志" />
           <span><b>Omni</b> Image Cleaner</span>
         </a>
         <span className="local-badge">本地处理</span>
@@ -177,7 +182,7 @@ export default function Home() {
 
           {videoFile ? <section className="video-pane" aria-label="视频处理结果">
             <div className="preview-heading"><span>视频工作区</span><small>{fileName}</small></div>
-            <iframe ref={videoFrameRef} src="/video/video-preview.html" title="Omni 本地视频水印清理" onLoad={() => { void handoffVideoToWorkspace(); }} />
+            <iframe ref={videoFrameRef} src={`${basePath}/video/video-preview.html`} title="Omni 本地视频水印清理" onLoad={() => { void handoffVideoToWorkspace(); }} />
             <div className="actions"><button className="secondary" type="button" onClick={reset}>重新开始</button></div>
           </section> : <section className="result-pane" aria-label="处理结果">
             <div className="preview-heading"><span>处理结果</span>{fileName && <small>{fileName}</small>}</div>
