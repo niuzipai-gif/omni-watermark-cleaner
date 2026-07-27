@@ -1,6 +1,7 @@
 node_modules/
 .agents/
 .codex/
+.superpowers/
 dist-electron/
 dist-renderer/
 release/
