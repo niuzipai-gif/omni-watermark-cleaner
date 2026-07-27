@@ -184,27 +184,16 @@ $readmeContent = @(
   "4. Drag PNG, JPG, JPEG, or WEBP images for local Gemini image cleanup. Image dimensions and alpha are preserved.",
   "5. Drag MP4, M4V, MOV, or WEBM videos. The app detects aspect ratio automatically and uses local frame-accurate Gemini cleanup first for all ratios, including 16:9 and 9:16.",
   "6. The default output folder is Omni Watermark Cleaner Output on the current user's Desktop. You can change it inside the app.",
-  "7. On a new PC, double-click Create Desktop Shortcut.cmd to create a desktop shortcut. It caches the icon locally and can recover the portable folder path if the folder is on Desktop, Downloads, Documents, a drive root, or the last saved path.",
+  "7. On a new PC, double-click Create Desktop Shortcut.cmd once. It creates the Desktop shortcut, caches the icon locally, and can recover the portable folder path after moves.",
   "",
   "Notes:",
   "- Keep the app folder next to this launcher. Do not copy only the exe.",
-  "- The .lnk inside this folder is a convenience copy. For the Desktop shortcut on a new PC, use Create Desktop Shortcut.cmd so the icon is cached locally and the launcher can find the copied folder.",
+  "- Start Omni Watermark Cleaner.cmd always starts from this copied folder. Do not use an old .lnk copied from another PC; create a new Desktop shortcut with Create Desktop Shortcut.cmd.",
   "- Supported Gemini image cleanup is local. It does not upload images, crop them, or intentionally add blur or mosaic blocks. Visible residuals use a closely matched nearby texture patch or fail without writing an output.",
   "- Exact Gemini cleanup runs locally and does not upload your video. Larger or longer videos take longer because every frame is checked.",
   "- If Gemini's exact watermark cannot be safely detected, the app uses a high-bitrate local compatibility fallback. It avoids failure, but may leave small residuals on non-Gemini marks."
 ) -join [Environment]::NewLine
 $readmeContent | Set-Content -LiteralPath (Join-Path $packageRoot "README.txt") -Encoding ASCII
-
-$shortcutPath = Join-Path $packageRoot "Omni Watermark Cleaner.lnk"
-$targetPath = Join-Path $appTarget "Omni Watermark Cleaner.exe"
-$iconPath = Join-Path $assetsTarget "omni-cleaner.ico"
-$shell = New-Object -ComObject WScript.Shell
-$shortcut = $shell.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $targetPath
-$shortcut.WorkingDirectory = Split-Path $targetPath -Parent
-$shortcut.IconLocation = "$iconPath,0"
-$shortcut.Description = "Omni video watermark cleaner portable"
-$shortcut.Save()
 
 $size = (Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Measure-Object -Property Length -Sum).Sum
 $count = (Get-ChildItem -LiteralPath $packageRoot -Recurse -File | Measure-Object).Count

@@ -15,7 +15,6 @@ $requiredFiles = @(
   (Join-Path $packageRoot "Create Desktop Shortcut.cmd"),
   (Join-Path $packageRoot "Create Desktop Shortcut.ps1"),
   (Join-Path $packageRoot "Run Portable Self Test.cmd"),
-  (Join-Path $packageRoot "Omni Watermark Cleaner.lnk"),
   (Join-Path $packageRoot "README.txt"),
   (Join-Path $packageRoot "SHA256SUMS.txt"),
   (Join-Path $packageRoot "assets\omni-cleaner.ico")

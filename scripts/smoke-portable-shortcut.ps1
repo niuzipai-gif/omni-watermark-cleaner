@@ -9,12 +9,16 @@ $launcherPath = Join-Path $launcherDir "OmniWatermarkLauncher.ps1"
 $cachedIcon = Join-Path $launcherDir "omni-cleaner.ico"
 $pathFile = Join-Path $launcherDir "portable-root.txt"
 $desktopShortcut = Join-Path ([Environment]::GetFolderPath("Desktop")) "Omni Watermark Cleaner.lnk"
+$portableShortcut = Join-Path $packageRoot "Omni Watermark Cleaner.lnk"
 
 if (-not (Test-Path -LiteralPath $shortcutInstaller)) {
   throw "Missing shortcut installer: $shortcutInstaller"
 }
 if (-not (Test-Path -LiteralPath $appExe)) {
   throw "Missing portable app exe: $appExe"
+}
+if (Test-Path -LiteralPath $portableShortcut) {
+  throw "Portable package must not contain a machine-bound shortcut: $portableShortcut"
 }
 
 & powershell -NoProfile -ExecutionPolicy Bypass -File $shortcutInstaller
