@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { removeWatermarkFromBuffer } from '@pilio/gemini-watermark-remover/node';
 import sharp from 'sharp';
@@ -60,14 +61,14 @@ export async function runImageWatermarkRemoval(
       throw new Error(`Gemini watermark was not safely detected: ${processed.meta.skipReason ?? 'unknown reason'}`);
     }
     let outputBuffer = processed.buffer;
-    let meta: ImageRemovalMeta & { repair?: 'matched-patch' } = processed.meta;
+    let meta: ImageRemovalMeta & { repair?: 'residual-repair' } = processed.meta;
     if (processed.meta.detection?.residualVisibility?.visible) {
       const repaired = await (dependencies.repair ?? repairGeminiResidual)(processed, request);
       if (!repaired) {
         throw new Error('Gemini watermark could not be fully removed without visible residuals.');
       }
       outputBuffer = repaired;
-      meta = { ...processed.meta, repair: 'matched-patch' };
+      meta = { ...processed.meta, repair: 'residual-repair' };
     }
 
     await dependencies.writeFile(request.outputPath, outputBuffer);
@@ -110,9 +111,57 @@ async function removeGeminiWatermark(input: Buffer, request: ImageRemovalRequest
 }
 
 async function repairGeminiResidual(processed: ImageEngineResult, request: ImageRemovalRequest): Promise<Buffer | null> {
-  const repaired = repairVisibleResidual(processed.imageData, processed.meta.position);
-  if (!repaired) return null;
-  return encodeImageData(repaired, request.outputPath);
+  const contourRepaired = await repairGeminiOutline(processed.imageData, processed.meta.position);
+  const source = contourRepaired ?? processed.imageData;
+  const patchRepaired = repairVisibleResidual(source, processed.meta.position);
+  if (patchRepaired) return encodeImageData(patchRepaired, request.outputPath);
+  if (contourRepaired) return encodeImageData(contourRepaired, request.outputPath);
+  return null;
+}
+
+interface ContourRepairResult {
+  accepted: boolean;
+}
+
+interface ContourRepairModule {
+  repairDarkOutlineContour: (imageData: RawImageData, position: WatermarkRegion) => ContourRepairResult;
+}
+
+let contourRepairModule: Promise<ContourRepairModule | null> | undefined;
+
+async function repairGeminiOutline(
+  imageData: RawImageData | undefined,
+  position: WatermarkRegion | null | undefined
+): Promise<RawImageData | null> {
+  if (!imageData || !position || position.width !== 96 || position.height !== 96) return null;
+
+  const module = await loadContourRepairModule();
+  if (!module) return null;
+
+  const repaired: RawImageData = { ...imageData, data: Uint8ClampedArray.from(imageData.data) };
+  let applied = false;
+  for (let pass = 0; pass < 2; pass += 1) {
+    const result = module.repairDarkOutlineContour(repaired, position);
+    if (!result.accepted) break;
+    applied = true;
+  }
+
+  return applied ? repaired : null;
+}
+
+function loadContourRepairModule(): Promise<ContourRepairModule | null> {
+  if (!contourRepairModule) {
+    contourRepairModule = (async () => {
+      try {
+        const nodeSdkPath = fileURLToPath(import.meta.resolve('@pilio/gemini-watermark-remover/node'));
+        const repairPath = path.resolve(path.dirname(nodeSdkPath), '..', 'core', 'darkOutlineContourRepair.js');
+        return await import(pathToFileURL(repairPath).href) as ContourRepairModule;
+      } catch {
+        return null;
+      }
+    })();
+  }
+  return contourRepairModule;
 }
 
 function encodeImageData(imageData: RawImageData, outputPath: string): Promise<Buffer> {

@@ -71,7 +71,7 @@ describe('image watermark removal', () => {
     expect(removeFile).toHaveBeenCalledWith('D:/out/photo-clean.png', { force: true });
   });
 
-  it('writes the matched-patch repair when the engine reports a visible residual', async () => {
+  it('writes a residual repair when the engine reports a visible residual', async () => {
     const writeFile = vi.fn().mockResolvedValue(undefined);
     const repair = vi.fn().mockResolvedValue(Buffer.from('repaired'));
 
@@ -96,6 +96,6 @@ describe('image watermark removal', () => {
 
     expect(repair).toHaveBeenCalledOnce();
     expect(writeFile).toHaveBeenCalledWith('D:/out/photo-clean.png', Buffer.from('repaired'));
-    expect(result.meta).toMatchObject({ repair: 'matched-patch' });
+    expect(result.meta).toMatchObject({ repair: 'residual-repair' });
   });
 });
