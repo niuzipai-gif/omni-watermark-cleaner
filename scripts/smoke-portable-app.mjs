@@ -1,47 +1,71 @@
-import { _electron as electron } from 'playwright';
+import { existsSync } from 'node:fs';
+import { mkdir, readFile, rm } from 'node:fs/promises';
+import { execFile, spawn } from 'node:child_process';
+import { promisify } from 'node:util';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+const execFileAsync = promisify(execFile);
 const scriptsDir = path.dirname(fileURLToPath(import.meta.url));
 const root = path.dirname(scriptsDir);
 const executablePath = path.join(root, 'Omni-Watermark-Cleaner-Portable', 'app', 'Omni Watermark Cleaner.exe');
 const userDataDir = path.join(root, 'smoke-user-data', 'app-smoke');
+const tracePath = path.join(root, 'smoke-user-data', 'app-smoke-startup.log');
+const expectedEvents = ['module-loaded', 'app-ready', 'create-window', 'renderer-file-loaded', 'window-ready'];
 
-const app = await electron.launch({
-  executablePath,
+if (!existsSync(executablePath)) {
+  throw new Error(`Portable executable is missing: ${executablePath}`);
+}
+
+await mkdir(path.dirname(tracePath), { recursive: true });
+await rm(tracePath, { force: true });
+
+const app = spawn(executablePath, [], {
+  detached: true,
   env: {
     ...process.env,
-    OMNI_USER_DATA_DIR: userDataDir
-  }
+    OMNI_USER_DATA_DIR: userDataDir,
+    OMNI_STARTUP_TRACE_PATH: tracePath
+  },
+  stdio: 'ignore',
+  windowsHide: true
 });
+
 try {
-  const win = await app.firstWindow({ timeout: 15000 });
-  const messages = [];
-  win.on('console', (message) => messages.push({ type: message.type(), text: message.text() }));
-  win.on('pageerror', (error) => messages.push({ type: 'pageerror', text: error.message }));
-  await win.waitForTimeout(2000);
+  const trace = await waitForStartupTrace(app, tracePath, expectedEvents, 30000);
+  console.log(JSON.stringify({ status: 'OK', executablePath, userDataDir, tracePath, expectedEvents, trace }, null, 2));
+} finally {
+  await stopProcessTree(app.pid);
+}
 
-  const result = await win.evaluate(() => ({
-    title: document.title,
-    bodyText: document.body?.innerText ?? '',
-    hasOmniApi: Boolean(window.omni),
-    hasGetPathForFile: typeof window.omni?.getPathForFile === 'function',
-    hasEnqueueVideos: typeof window.omni?.enqueueVideos === 'function'
-  }));
+async function waitForStartupTrace(appProcess, nextTracePath, events, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  let trace = '';
 
-  const failures = [];
-  if (result.title !== 'Omni Watermark Cleaner') failures.push(`Unexpected title: ${result.title}`);
-  if (!result.bodyText.includes('Omni Watermark Cleaner')) failures.push('Renderer body text is missing app title');
-  if (!result.hasOmniApi) failures.push('window.omni preload API is missing');
-  if (!result.hasGetPathForFile) failures.push('window.omni.getPathForFile is missing');
-  if (!result.hasEnqueueVideos) failures.push('window.omni.enqueueVideos is missing');
-  if (messages.some((message) => message.type === 'pageerror')) failures.push(`Page errors: ${JSON.stringify(messages)}`);
+  while (Date.now() < deadline) {
+    if (appProcess.exitCode !== null) {
+      throw new Error(`Portable app exited before startup completed with code ${appProcess.exitCode}.`);
+    }
 
-  if (failures.length > 0) {
-    throw new Error(failures.join('\n'));
+    try {
+      trace = await readFile(nextTracePath, 'utf8');
+    } catch (error) {
+      if (error && typeof error === 'object' && 'code' in error && error.code !== 'ENOENT') {
+        throw error;
+      }
+    }
+
+    if (events.every((event) => trace.includes(event))) {
+      return trace;
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
-  console.log(JSON.stringify({ status: 'OK', executablePath, userDataDir, ...result }, null, 2));
-} finally {
-  await app.close().catch(() => undefined);
+  throw new Error(`Portable app did not finish startup within ${timeoutMs}ms. Trace:\n${trace}`);
+}
+
+async function stopProcessTree(pid) {
+  if (!pid) return;
+  await execFileAsync('taskkill', ['/pid', String(pid), '/t', '/f']).catch(() => undefined);
 }

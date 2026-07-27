@@ -1,7 +1,21 @@
+export type MediaKind = 'image' | 'video';
+
+const SUPPORTED_IMAGE_EXTENSIONS = new Set(['.png', '.jpg', '.jpeg', '.webp']);
 const SUPPORTED_VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.mov', '.webm']);
 
+export function getMediaKind(filePath: string): MediaKind | null {
+  const extension = getExtension(filePath).toLowerCase();
+  if (SUPPORTED_IMAGE_EXTENSIONS.has(extension)) return 'image';
+  if (SUPPORTED_VIDEO_EXTENSIONS.has(extension)) return 'video';
+  return null;
+}
+
+export function isSupportedMediaFile(filePath: string): boolean {
+  return getMediaKind(filePath) !== null;
+}
+
 export function isSupportedVideoFile(filePath: string): boolean {
-  return SUPPORTED_VIDEO_EXTENSIONS.has(getExtension(filePath).toLowerCase());
+  return getMediaKind(filePath) === 'video';
 }
 
 export function createOutputPath(

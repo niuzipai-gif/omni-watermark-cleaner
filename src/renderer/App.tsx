@@ -2,7 +2,7 @@ import { CheckCircle2, Clock3, Folder, FolderOpen, Loader2, Settings2, TriangleA
 import { useEffect, useMemo, useState } from 'react';
 
 import type { AppSettings, ProcessingTask } from '../types/omniApi';
-import { isSupportedVideoFile } from '../shared/videoFiles';
+import { isSupportedMediaFile } from '../shared/videoFiles';
 
 const DEFAULT_SETTINGS: AppSettings = {
   outputDirectory: null,
@@ -24,7 +24,7 @@ const fallbackApi = {
   getPathForFile(file: File) {
     return getDroppedFilePathFallback(file);
   },
-  async enqueueVideos() {
+  async enqueueFiles() {
     return [];
   },
   async openPath() {
@@ -87,15 +87,15 @@ export default function App() {
       .map((file) => getDroppedFilePath(file, api))
       .filter(Boolean);
 
-    const rejected = paths.filter((filePath) => !isSupportedVideoFile(filePath));
-    const accepted = paths.filter(isSupportedVideoFile);
+    const rejected = paths.filter((filePath) => !isSupportedMediaFile(filePath));
+    const accepted = paths.filter(isSupportedMediaFile);
 
     if (rejected.length > 0) {
       setNotice(`不支持的文件：${rejected.map((filePath) => basename(filePath)).join('、')}`);
     }
 
     if (accepted.length === 0) return;
-    const queued = await api.enqueueVideos(accepted);
+    const queued = await api.enqueueFiles(accepted);
     setTasks((current) => queued.reduce(upsertTask, current));
   }
 
@@ -104,7 +104,7 @@ export default function App() {
       <header className="topbar">
         <div>
           <h1>Omni Watermark Cleaner</h1>
-          <p>拖入 Gemini / Veo 生成视频，清理右下角可见水印并导出到指定文件夹。</p>
+          <p>拖入 Gemini 图片或 Veo 视频，本地清理支持的可见水印并导出到指定文件夹。</p>
         </div>
         <button className="icon-button primary" type="button" onClick={chooseOutputDirectory} aria-label="更换导出文件夹">
           <FolderOpen size={18} />
@@ -178,8 +178,8 @@ export default function App() {
             }}
           >
             <Upload size={32} />
-            <h2>把视频直接拖到这里</h2>
-            <p>支持 MP4、M4V、MOV、WEBM。导出文件会自动命名为 <span>原名-clean</span>。</p>
+            <h2>把图片或视频直接拖到这里</h2>
+            <p>支持 PNG、JPG、JPEG、WEBP、MP4、M4V、MOV、WEBM。图片保留原始尺寸，导出文件自动命名为 <span>原名-clean</span>。</p>
           </div>
 
           {notice ? (
@@ -195,7 +195,7 @@ export default function App() {
           </div>
 
           <div className="task-list">
-            {tasks.length === 0 ? <div className="empty-state">拖入视频后会在这里显示处理进度。</div> : null}
+            {tasks.length === 0 ? <div className="empty-state">拖入图片或视频后会在这里显示处理进度。</div> : null}
             {tasks.map((task) => (
               <TaskRow key={task.id} task={task} />
             ))}
@@ -212,7 +212,9 @@ function TaskRow({ task }: { task: ProcessingTask }) {
     <article className={`task-row ${task.status}`}>
       <Icon className={task.status === 'processing' ? 'spin' : ''} size={19} />
       <div>
-        <strong>{basename(task.inputPath)}</strong>
+        <strong>
+          {basename(task.inputPath)} <span className="media-kind">{task.mediaKind === 'image' ? '图片' : '视频'}</span>
+        </strong>
         <span>{getTaskDetail(task)}</span>
       </div>
       <StatusPill status={task.status} />

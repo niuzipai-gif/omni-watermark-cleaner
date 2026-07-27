@@ -292,6 +292,14 @@ input:not([type]) {
   color: #172033;
 }
 
+.task-row .media-kind {
+  display: inline;
+  margin-left: 6px;
+  color: #657287;
+  font-size: 12px;
+  font-weight: 600;
+}
+
 .task-row div > span {
   margin-top: 3px;
   color: #657287;
