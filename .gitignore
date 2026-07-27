@@ -2,6 +2,7 @@ node_modules/
 .agents/
 .codex/
 .superpowers/
+.worktrees/
 dist-electron/
 dist-renderer/
 release/
