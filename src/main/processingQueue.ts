@@ -2,15 +2,18 @@ import { EventEmitter } from 'node:events';
 import { mkdir } from 'node:fs/promises';
 
 import type { AppSettings } from './settingsStore';
+import type { ImageRemovalRequest } from './imageWatermarkRemoval';
+import { runImageWatermarkRemoval } from './imageWatermarkRemoval';
 import type { RemovalRequest, RemovalResult } from './removalRunner';
 import { runWatermarkRemoval } from './removalRunner';
-import { createOutputPath, isSupportedVideoFile } from '../shared/videoFiles';
+import { createOutputPath, getMediaKind, type MediaKind } from '../shared/videoFiles';
 
 export type TaskStatus = 'queued' | 'processing' | 'done' | 'failed';
 
 export interface ProcessingTask {
   id: string;
   inputPath: string;
+  mediaKind: MediaKind | null;
   outputPath: string | null;
   status: TaskStatus;
   error: string | null;
@@ -21,6 +24,8 @@ export interface ProcessingTask {
 
 export interface ProcessingQueueOptions {
   runner?: (request: RemovalRequest) => Promise<RemovalResult>;
+  videoRunner?: (request: RemovalRequest) => Promise<RemovalResult>;
+  imageRunner?: (request: ImageRemovalRequest) => Promise<RemovalResult>;
   exists?: (candidate: string) => boolean;
   timeoutGraceMs?: number;
 }
@@ -29,14 +34,16 @@ type ProcessingQueueEvents = 'task-updated';
 const MAX_PROCESSING_ATTEMPTS = 3;
 
 export class ProcessingQueue extends EventEmitter {
-  private readonly runner: (request: RemovalRequest) => Promise<RemovalResult>;
+  private readonly videoRunner: (request: RemovalRequest) => Promise<RemovalResult>;
+  private readonly imageRunner: (request: ImageRemovalRequest) => Promise<RemovalResult>;
   private readonly exists: (candidate: string) => boolean;
   private readonly timeoutGraceMs: number;
   private chain = Promise.resolve();
 
   constructor(options: ProcessingQueueOptions = {}) {
     super();
-    this.runner = options.runner ?? runWatermarkRemoval;
+    this.videoRunner = options.videoRunner ?? options.runner ?? runWatermarkRemoval;
+    this.imageRunner = options.imageRunner ?? runImageWatermarkRemoval;
     this.exists = options.exists ?? (() => false);
     this.timeoutGraceMs = options.timeoutGraceMs ?? 30_000;
   }
@@ -67,6 +74,7 @@ export class ProcessingQueue extends EventEmitter {
     const task: ProcessingTask = {
       id: `${now}-${Math.random().toString(16).slice(2)}`,
       inputPath,
+      mediaKind: getMediaKind(inputPath),
       outputPath: null,
       status: 'queued',
       error: null,
@@ -75,15 +83,15 @@ export class ProcessingQueue extends EventEmitter {
       updatedAt: now
     };
 
-    if (!isSupportedVideoFile(inputPath)) {
+    if (!task.mediaKind) {
       task.status = 'failed';
-      task.error = `Unsupported video file: ${inputPath}`;
+      task.error = `Unsupported media file: ${inputPath}`;
       return task;
     }
 
     if (!outputDirectory) {
       task.status = 'failed';
-      task.error = 'Choose an output directory before dropping videos.';
+      task.error = 'Choose an output directory before dropping files.';
       return task;
     }
 
@@ -95,10 +103,27 @@ export class ProcessingQueue extends EventEmitter {
     if (!task.outputPath) return;
 
     this.updateTask(task, { status: 'processing' });
+    if (task.mediaKind === 'image') {
+      try {
+        const result = await withTimeout(
+          this.imageRunner({ inputPath: task.inputPath, outputPath: task.outputPath }),
+          settings.timeoutMs + this.timeoutGraceMs,
+          `Processing timed out after ${Math.round((settings.timeoutMs + this.timeoutGraceMs) / 1000)} seconds.`
+        );
+        this.updateTask(task, { status: 'done', result, error: null });
+      } catch (error) {
+        this.updateTask(task, {
+          status: 'failed',
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+      return;
+    }
+
     for (let attempt = 1; attempt <= MAX_PROCESSING_ATTEMPTS; attempt += 1) {
       try {
         const result = await withTimeout(
-          this.runner({
+          this.videoRunner({
             inputPath: task.inputPath,
             outputPath: task.outputPath,
             videoPage: settings.videoPage,

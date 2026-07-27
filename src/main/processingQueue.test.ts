@@ -13,7 +13,7 @@ describe('processing queue', () => {
     const events: unknown[] = [];
     queue.on('task-updated', (task) => events.push(task));
 
-    const tasks = await queue.enqueue(['F:/in/frame.png'], {
+    const tasks = await queue.enqueue(['F:/in/frame.txt'], {
       outputDirectory: 'D:/exports',
       videoPage: 'https://geminiwatermarkremover.io/video',
       timeoutMs: 900000,
@@ -21,7 +21,7 @@ describe('processing queue', () => {
     });
 
     expect(tasks[0].status).toBe('failed');
-    expect(tasks[0].error).toContain('Unsupported video file');
+    expect(tasks[0].error).toContain('Unsupported media file');
     expect(runner).not.toHaveBeenCalled();
     expect(events).toHaveLength(1);
   });
@@ -130,5 +130,50 @@ describe('processing queue', () => {
     } finally {
       await rm(dir, { recursive: true, force: true });
     }
+  });
+
+  it('dispatches PNG input to the image runner without video-page settings', async () => {
+    const imageRunner = vi.fn().mockResolvedValue({
+      input: 'F:/in/photo.png',
+      output: 'D:\\exports\\photo-clean.png',
+      kind: 'image'
+    });
+    const videoRunner = vi.fn().mockResolvedValue({
+      input: 'F:/in/photo.png',
+      output: 'D:\\exports\\photo-clean.png',
+      kind: 'video'
+    });
+    const queue = new ProcessingQueue({ runner: videoRunner, imageRunner, videoRunner, exists: () => false });
+
+    const [task] = await queue.enqueue(['F:/in/photo.png'], {
+      outputDirectory: 'D:/exports',
+      videoPage: 'https://geminiwatermarkremover.io/video',
+      timeoutMs: 900000,
+      allowLowConfidence: false
+    });
+
+    expect(task).toMatchObject({ mediaKind: 'image', status: 'done' });
+    expect(imageRunner).toHaveBeenCalledWith({
+      inputPath: 'F:/in/photo.png',
+      outputPath: 'D:\\exports\\photo-clean.png'
+    });
+    expect(videoRunner).not.toHaveBeenCalled();
+  });
+
+  it('reports unsupported non-media files without invoking either runner', async () => {
+    const imageRunner = vi.fn();
+    const videoRunner = vi.fn();
+    const queue = new ProcessingQueue({ runner: videoRunner, imageRunner, videoRunner, exists: () => false });
+
+    const [task] = await queue.enqueue(['F:/in/notes.txt'], {
+      outputDirectory: 'D:/exports',
+      videoPage: 'https://geminiwatermarkremover.io/video',
+      timeoutMs: 900000,
+      allowLowConfidence: false
+    });
+
+    expect(task.error).toContain('Unsupported media file');
+    expect(imageRunner).not.toHaveBeenCalled();
+    expect(videoRunner).not.toHaveBeenCalled();
   });
 });
