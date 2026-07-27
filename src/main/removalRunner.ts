@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import path from 'node:path';
 import type { Browser, Page } from 'playwright';
 
-import { runLocalVideoCleanup } from './localVideoCleanup';
+import { runFrameAccurateVideoCleanup, runLocalVideoCleanup } from './localVideoCleanup';
 import { getDefaultWatermarkRegion, readVideoMetadataWithBrowser, type VideoMetadata } from './videoAnalysis';
 
 export interface RemovalRequest {
@@ -29,7 +29,7 @@ export interface RemovalResult {
   meta?: Record<string, unknown> | null;
 }
 
-export type ProcessingStrategy = 'public-page' | 'local-region';
+export type ProcessingStrategy = 'public-page' | 'local-alpha' | 'local-region';
 
 export function buildGwrArgs(request: RemovalRequest): string[] {
   const args = [
@@ -86,24 +86,11 @@ export async function processVideoWithPublicPage(request: RemovalRequest): Promi
 
   try {
     const metadata = await readVideoMetadataWithBrowser(browser, request.inputPath);
-    const strategy = selectProcessingStrategy(metadata);
-    if (strategy === 'local-region') {
-      const region = getDefaultWatermarkRegion(metadata);
-      return runLocalCleanupWithMeta(request, metadata, region, strategy, startedAt);
-    }
-
     try {
-      return await processWithPublicPage(browser, request, metadata, strategy, startedAt);
-    } catch (error) {
-      if (!request.allowLowConfidence) {
-        throw new Error(
-          `High-quality public page cleanup failed. Enable "allow low confidence results" to use the local ffmpeg fallback. ${
-            error instanceof Error ? error.message : String(error)
-          }`
-        );
-      }
+      return await runFrameAccurateCleanupWithMeta(request, metadata, startedAt);
+    } catch (frameAccurateError) {
       const region = getDefaultWatermarkRegion(metadata);
-      return runLocalCleanupWithMeta(request, metadata, region, 'local-region', startedAt, error);
+      return runLocalCleanupWithMeta(request, metadata, region, 'local-region', startedAt, frameAccurateError);
     }
   } finally {
     await closeBrowserQuietly(browser);
@@ -111,7 +98,31 @@ export async function processVideoWithPublicPage(request: RemovalRequest): Promi
 }
 
 export function selectProcessingStrategy(metadata: VideoMetadata): ProcessingStrategy {
-  return 'public-page';
+  return metadata.aspect === 'landscape' || metadata.aspect === 'portrait' || metadata.aspect === 'square' || metadata.aspect === 'other'
+    ? 'local-alpha'
+    : 'local-region';
+}
+
+async function runFrameAccurateCleanupWithMeta(
+  request: RemovalRequest,
+  metadata: VideoMetadata,
+  startedAt: number
+): Promise<RemovalResult> {
+  const result = await runFrameAccurateVideoCleanup({
+    inputPath: request.inputPath,
+    outputPath: request.outputPath,
+    durationSeconds: metadata.duration,
+    region: getDefaultWatermarkRegion(metadata)
+  });
+  return {
+    ...result,
+    meta: {
+      ...result.meta,
+      strategy: 'local-alpha',
+      metadata,
+      elapsedMs: Date.now() - startedAt
+    }
+  };
 }
 
 async function processWithPublicPage(
@@ -123,14 +134,18 @@ async function processWithPublicPage(
 ): Promise<RemovalResult> {
   const page = await openVideoPageWithRetry(browser, request.videoPage, request.timeoutMs);
   page.setDefaultTimeout(request.timeoutMs);
-  await page.locator('input[type="file"]').setInputFiles(request.inputPath);
-  await page.getByText('Start local cleanup', { exact: true }).click();
+  const workspace = page.frameLocator('iframe');
+  await workspace.locator('#fileInput').setInputFiles(request.inputPath);
+  await workspace.locator('#processBtn:not([disabled])').waitFor({ state: 'visible', timeout: request.timeoutMs });
+  // The host page overlays visual cards over the embedded workspace. The
+  // button is already verified enabled, so dispatch directly to the iframe.
+  await workspace.locator('#processBtn').dispatchEvent('click');
 
-  const downloadLink = page.locator('a[download][href^="blob:"]');
+  const downloadLink = workspace.locator('#downloadBtn[download][href^="blob:"]');
   await downloadLink.waitFor({ state: 'attached', timeout: request.timeoutMs });
 
   const downloadPromise = page.waitForEvent('download', { timeout: request.timeoutMs });
-  await downloadLink.click();
+  await downloadLink.dispatchEvent('click');
   const download = await downloadPromise;
   await download.saveAs(request.outputPath);
 
@@ -200,7 +215,11 @@ async function openVideoPageWithRetry(
 
 async function gotoVideoPage(page: Page, url: string, timeoutMs: number): Promise<void> {
   await page.goto(url, { waitUntil: 'domcontentloaded', timeout: timeoutMs });
-  await page.locator('input[type="file"]').waitFor({ state: 'attached', timeout: timeoutMs });
+  const workspace = page.frameLocator('iframe');
+  await workspace.locator('#fileInput').waitFor({ state: 'attached', timeout: timeoutMs });
+  // The embedded workspace binds its handlers after the iframe document exists.
+  // Its initial state deliberately disables Export until a file has loaded.
+  await workspace.locator('#processBtn[disabled]').waitFor({ state: 'attached', timeout: timeoutMs });
 }
 
 async function closeBrowserQuietly(browser: Browser): Promise<void> {

@@ -32,21 +32,22 @@ try {
       await window.omni.saveSettings({
         ...settings,
         outputDirectory: nextOutputDirectory,
-        timeoutMs: 120000,
+        timeoutMs: 15 * 60 * 1000,
         allowLowConfidence: true
       });
     },
     { outputDirectory }
   );
 
-  const tasks = await win.evaluate((videoPath) => window.omni.enqueueVideos([videoPath]), inputPath);
+  const tasks = await win.evaluate((videoPath) => window.omni.enqueueFiles([videoPath]), inputPath);
   const task = tasks[0];
   const failures = [];
 
-  if (!task) failures.push('No task returned from enqueueVideos');
+  if (!task) throw new Error('No task returned from enqueueFiles');
+
   if (task?.status !== 'done') failures.push(`Expected done task, got ${task?.status}: ${task?.error ?? 'no error'}`);
   if (task?.outputPath !== outputPath) failures.push(`Unexpected outputPath: ${task?.outputPath}`);
-  if (!['public-page', 'local-region'].includes(task?.result?.meta?.strategy)) {
+  if (!['local-alpha', 'public-page', 'local-region'].includes(task?.result?.meta?.strategy)) {
     failures.push(`Unexpected processing strategy: ${task?.result?.meta?.strategy}`);
   }
   if (task?.result?.meta?.metadata?.aspect !== 'portrait') failures.push(`Expected portrait aspect, got ${task?.result?.meta?.metadata?.aspect}`);
@@ -58,6 +59,8 @@ try {
     failures.push(`Output file missing: ${error instanceof Error ? error.message : String(error)}`);
   }
   if (outputBytes < 100000) failures.push(`Output file too small: ${outputBytes} bytes`);
+
+  if (failures.length > 0) throw new Error(failures.join('\n'));
 
   const outputMetadata = await readOutputVideoMetadata(outputPath);
   if (outputMetadata.width <= 0 || outputMetadata.height <= 0) {

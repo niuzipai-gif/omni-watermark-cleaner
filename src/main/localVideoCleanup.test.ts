@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import path from 'node:path';
 
-import { buildLocalCleanupFfmpegArgs, resolveFfmpegPathFromCandidates } from './localVideoCleanup';
+import { buildFrameEncodeFfmpegArgs, buildLocalCleanupFfmpegArgs, resolveFfmpegPathFromCandidates } from './localVideoCleanup';
 
 describe('local video cleanup', () => {
   it('builds ffmpeg args that interpolate the detected watermark region', () => {
@@ -23,9 +24,9 @@ describe('local video cleanup', () => {
       '-c:v',
       'libx264',
       '-preset',
-      'veryfast',
+      'medium',
       '-crf',
-      '18',
+      '15',
       '-c:a',
       'copy',
       'D:/out/portrait-clean.mp4'
@@ -42,5 +43,18 @@ describe('local video cleanup', () => {
     );
 
     expect(path).toBe('F:/omni/release/win-unpacked/resources/app.asar.unpacked/node_modules/ffmpeg-static/ffmpeg.exe');
+  });
+
+  it('re-encodes frame-accurate output at a high quality while copying original audio', () => {
+    expect(buildFrameEncodeFfmpegArgs({
+      framesDirectory: 'F:/work/cleaned',
+      inputPath: 'F:/in/portrait.mp4',
+      outputPath: 'D:/out/portrait-clean.mp4',
+      frameRate: 60
+    })).toEqual([
+      '-y', '-framerate', '60', '-i', path.join('F:/work/cleaned', 'frame-%08d.png'), '-i', 'F:/in/portrait.mp4',
+      '-map', '0:v:0', '-map', '1:a?', '-c:v', 'libx264', '-preset', 'medium', '-crf', '15',
+      '-pix_fmt', 'yuv420p', '-c:a', 'copy', '-shortest', 'D:/out/portrait-clean.mp4'
+    ]);
   });
 });

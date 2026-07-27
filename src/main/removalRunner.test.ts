@@ -116,16 +116,16 @@ describe('removal runner', () => {
     });
   });
 
-  it('selects public page processing for 16:9 landscape videos', () => {
-    expect(selectProcessingStrategy({ width: 1920, height: 1080, duration: 6, aspect: 'landscape' })).toBe('public-page');
+  it('selects exact local alpha cleanup for 16:9 landscape videos', () => {
+    expect(selectProcessingStrategy({ width: 1920, height: 1080, duration: 6, aspect: 'landscape' })).toBe('local-alpha');
   });
 
-  it('selects public page processing for portrait and square videos', () => {
-    expect(selectProcessingStrategy({ width: 1080, height: 1920, duration: 6, aspect: 'portrait' })).toBe('public-page');
-    expect(selectProcessingStrategy({ width: 1080, height: 1080, duration: 6, aspect: 'square' })).toBe('public-page');
+  it('selects exact local alpha cleanup for portrait and square videos', () => {
+    expect(selectProcessingStrategy({ width: 1080, height: 1920, duration: 6, aspect: 'portrait' })).toBe('local-alpha');
+    expect(selectProcessingStrategy({ width: 1080, height: 1080, duration: 6, aspect: 'square' })).toBe('local-alpha');
   });
 
-  it('selects public page processing for other uncommon ratios', () => {
-    expect(selectProcessingStrategy({ width: 1440, height: 1080, duration: 6, aspect: 'other' })).toBe('public-page');
+  it('selects exact local alpha cleanup for other uncommon ratios', () => {
+    expect(selectProcessingStrategy({ width: 1440, height: 1080, duration: 6, aspect: 'other' })).toBe('local-alpha');
   });
 });

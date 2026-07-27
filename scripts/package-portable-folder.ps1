@@ -182,7 +182,7 @@ $readmeContent = @(
   "2. Double-click Run Portable Self Test.cmd to verify the copied folder is complete and SHA256 checks pass.",
   "3. Double-click Start Omni Watermark Cleaner.cmd.",
   "4. Drag PNG, JPG, JPEG, or WEBP images for local Gemini image cleanup. Image dimensions and alpha are preserved.",
-  "5. Drag MP4, M4V, MOV, or WEBM videos. The app detects aspect ratio automatically and tries the high-quality public-page cleanup first for all ratios, including 16:9 and 9:16.",
+  "5. Drag MP4, M4V, MOV, or WEBM videos. The app detects aspect ratio automatically and uses local frame-accurate Gemini cleanup first for all ratios, including 16:9 and 9:16.",
   "6. The default output folder is Omni Watermark Cleaner Output on the current user's Desktop. You can change it inside the app.",
   "7. On a new PC, double-click Create Desktop Shortcut.cmd to create a desktop shortcut. It caches the icon locally and can recover the portable folder path if the folder is on Desktop, Downloads, Documents, a drive root, or the last saved path.",
   "",
@@ -190,8 +190,8 @@ $readmeContent = @(
   "- Keep the app folder next to this launcher. Do not copy only the exe.",
   "- The .lnk inside this folder is a convenience copy. For the Desktop shortcut on a new PC, use Create Desktop Shortcut.cmd so the icon is cached locally and the launcher can find the copied folder.",
   "- Supported Gemini image cleanup is local. It does not upload images, crop them, or intentionally add blur or mosaic blocks. Visible residuals use a closely matched nearby texture patch or fail without writing an output.",
-  "- Public-page cleanup requires internet access.",
-  "- Local ffmpeg cleanup is a low-confidence fallback. It may leave blur or mosaic artifacts, so the app only uses it when Allow low confidence results is enabled."
+  "- Exact Gemini cleanup runs locally and does not upload your video. Larger or longer videos take longer because every frame is checked.",
+  "- If Gemini's exact watermark cannot be safely detected, the app uses a high-bitrate local compatibility fallback. It avoids failure, but may leave small residuals on non-Gemini marks."
 ) -join [Environment]::NewLine
 $readmeContent | Set-Content -LiteralPath (Join-Path $packageRoot "README.txt") -Encoding ASCII
 

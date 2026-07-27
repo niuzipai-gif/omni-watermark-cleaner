@@ -76,8 +76,8 @@ describe('processing queue', () => {
     });
   });
 
-  it('does not retry high-quality public page failures when local fallback is disabled', async () => {
-    const runner = vi.fn().mockRejectedValue(new Error('High-quality public page cleanup failed. Enable "allow low confidence results" to use the local ffmpeg fallback.'));
+  it('retries a high-quality public page failure because the desktop runner now falls back locally', async () => {
+    const runner = vi.fn().mockRejectedValue(new Error('High-quality public page cleanup failed. The local fallback also failed.'));
     const queue = new ProcessingQueue({ runner, exists: () => false });
 
     const tasks = await queue.enqueue(['F:/in/clip.mp4'], {
@@ -87,7 +87,7 @@ describe('processing queue', () => {
       allowLowConfidence: false
     });
 
-    expect(runner).toHaveBeenCalledTimes(1);
+    expect(runner).toHaveBeenCalledTimes(3);
     expect(tasks[0]).toMatchObject({
       status: 'failed',
       error: expect.stringContaining('High-quality public page cleanup failed')

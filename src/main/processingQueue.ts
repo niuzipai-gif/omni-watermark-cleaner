@@ -163,7 +163,7 @@ export class ProcessingQueue extends EventEmitter {
 }
 
 function shouldRetryProcessingError(message: string): boolean {
-  return !message.startsWith('High-quality public page cleanup failed.') && !message.startsWith('Processing timed out after');
+  return !message.startsWith('Processing timed out after');
 }
 
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
