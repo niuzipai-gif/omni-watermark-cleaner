@@ -1,6 +1,8 @@
 "use client";
 
 import { ChangeEvent, DragEvent, useEffect, useRef, useState } from "react";
+import { repairDarkOutline } from "./contour-repair";
+import { repairVisibleResidual } from "./residual-repair";
 
 const ACCEPTED_TYPES = new Set(["image/png", "image/jpeg", "image/webp"]);
 
@@ -52,11 +54,14 @@ export default function Home() {
       const { removeWatermarkFromImageData } = await import("@pilio/gemini-watermark-remover/image-data");
       const cleaned = await removeWatermarkFromImageData(context.getImageData(0, 0, canvas.width, canvas.height));
       if (!cleaned.meta.applied) throw new Error("未能确认这是可安全处理的 Gemini 图片。");
+      let output = cleaned.imageData;
       if (cleaned.meta.detection?.residualVisibility?.visible) {
-        throw new Error("这张图片的背景过于复杂，网页版不会导出可能带残影的结果。请改用桌面版。" );
+        const contourFixed = await repairDarkOutline(output, cleaned.meta.position);
+        output = repairVisibleResidual(output, cleaned.meta.position) ?? (contourFixed ? output : null);
       }
+      if (!output) throw new Error("这张图片的背景过于复杂，网页版不会导出可能带残影的结果。请改用桌面版。");
 
-      context.putImageData(cleaned.imageData, 0, 0);
+      context.putImageData(new ImageData(output.data, output.width, output.height), 0, 0);
       const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
       if (!blob) throw new Error("浏览器无法生成结果图片。");
       setResultUrl(URL.createObjectURL(blob));
