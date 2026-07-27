@@ -15,7 +15,7 @@ function installMockApi(overrides: Partial<OmniApi> = {}) {
     saveSettings: vi.fn(async (settings) => settings),
     selectOutputDirectory: vi.fn().mockResolvedValue('E:\\cleaned'),
     getPathForFile: vi.fn((file) => (file as File & { path?: string }).path ?? file.name),
-    enqueueVideos: vi.fn().mockResolvedValue([]),
+    enqueueFiles: vi.fn().mockResolvedValue([]),
     openPath: vi.fn().mockResolvedValue(undefined),
     onTaskUpdated: vi.fn(() => () => undefined),
     ...overrides
@@ -50,13 +50,13 @@ describe('App', () => {
     );
   });
 
-  it('rejects dropped non-video files before enqueueing', async () => {
+  it('rejects dropped non-media files before enqueueing', async () => {
     const api = installMockApi();
     render(<App />);
     await screen.findByText('D:\\exports');
 
-    const file = new File(['x'], 'frame.png', { type: 'image/png' });
-    Object.defineProperty(file, 'path', { value: 'F:\\in\\frame.png' });
+    const file = new File(['x'], 'frame.txt', { type: 'text/plain' });
+    Object.defineProperty(file, 'path', { value: 'F:\\in\\frame.txt' });
 
     fireEvent.drop(screen.getByTestId('drop-zone'), {
       dataTransfer: {
@@ -65,7 +65,7 @@ describe('App', () => {
     });
 
     await waitFor(() => expect(screen.getByText(/不支持的文件/)).toBeInTheDocument());
-    expect(api.enqueueVideos).not.toHaveBeenCalled();
+    expect(api.enqueueFiles).not.toHaveBeenCalled();
   });
 
   it('uses Electron native file paths for dropped videos when File.path is unavailable', async () => {
@@ -84,7 +84,25 @@ describe('App', () => {
     });
 
     await waitFor(() =>
-      expect(api.enqueueVideos).toHaveBeenCalledWith(['E:\\视频素材\\Product_detail_video_showcase_202606221501.mp4'])
+      expect(api.enqueueFiles).toHaveBeenCalledWith(['E:\\视频素材\\Product_detail_video_showcase_202606221501.mp4'])
     );
+  });
+
+  it('queues a dropped PNG through the mixed-media API', async () => {
+    const api = installMockApi();
+    render(<App />);
+    await screen.findByText('D:\\exports');
+
+    const image = new File(['x'], 'Gemini.png', { type: 'image/png' });
+    Object.defineProperty(image, 'path', { value: 'F:\\in\\Gemini.png' });
+
+    fireEvent.drop(screen.getByTestId('drop-zone'), {
+      dataTransfer: {
+        files: [image]
+      }
+    });
+
+    await waitFor(() => expect(api.enqueueFiles).toHaveBeenCalledWith(['F:\\in\\Gemini.png']));
+    expect(screen.getByText(/PNG、JPG、JPEG、WEBP/)).toBeInTheDocument();
   });
 });

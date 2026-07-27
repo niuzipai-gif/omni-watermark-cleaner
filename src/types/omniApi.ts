@@ -8,7 +8,7 @@ export interface OmniApi {
   saveSettings(settings: AppSettings): Promise<AppSettings>;
   selectOutputDirectory(): Promise<string | null>;
   getPathForFile(file: File): string;
-  enqueueVideos(paths: string[]): Promise<ProcessingTask[]>;
+  enqueueFiles(paths: string[]): Promise<ProcessingTask[]>;
   openPath(path: string): Promise<void>;
   onTaskUpdated(callback: (task: ProcessingTask) => void): () => void;
 }

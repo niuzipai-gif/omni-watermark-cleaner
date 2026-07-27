@@ -80,7 +80,7 @@ function registerIpcHandlers() {
     return result.filePaths[0];
   });
 
-  ipcMain.handle('queue:enqueue-videos', async (_event, paths: string[]) => {
+  ipcMain.handle('queue:enqueue-files', async (_event, paths: string[]) => {
     const settings = await getSettings();
     return processingQueue.enqueue(paths, settings);
   });

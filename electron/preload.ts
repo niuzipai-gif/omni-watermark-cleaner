@@ -7,7 +7,7 @@ const api: OmniApi = {
   saveSettings: (settings) => ipcRenderer.invoke('settings:save', settings) as Promise<AppSettings>,
   selectOutputDirectory: () => ipcRenderer.invoke('dialog:select-output-directory') as Promise<string | null>,
   getPathForFile: (file) => webUtils.getPathForFile(file),
-  enqueueVideos: (paths) => ipcRenderer.invoke('queue:enqueue-videos', paths) as Promise<ProcessingTask[]>,
+  enqueueFiles: (paths) => ipcRenderer.invoke('queue:enqueue-files', paths) as Promise<ProcessingTask[]>,
   openPath: (targetPath) => ipcRenderer.invoke('shell:open-path', targetPath) as Promise<void>,
   onTaskUpdated(callback) {
     const listener = (_event: Electron.IpcRendererEvent, task: ProcessingTask) => callback(task);
