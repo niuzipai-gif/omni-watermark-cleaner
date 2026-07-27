@@ -16,6 +16,7 @@ smoke-output/
 smoke-unicode-input/
 smoke-unicode-output/
 smoke-user-data/
+test-results/
 
 *.zip
 *.7z

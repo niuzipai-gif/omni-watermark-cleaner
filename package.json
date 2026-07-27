@@ -20,6 +20,7 @@
     "smoke:portable-processing": "node scripts/smoke-portable-processing.mjs",
     "smoke:portable-unicode-paths": "node scripts/smoke-portable-unicode-paths.mjs",
     "smoke:portable-landscape-fallback": "node scripts/smoke-portable-landscape-fallback.mjs",
+    "smoke:image-watermark": "tsx scripts/smoke-image-watermark.ts",
     "dist:win": "npm run prepare:playwright-resources && npm run build && electron-builder --win dir",
     "dist:win:portable": "npm run prepare:playwright-resources && npm run build && electron-builder --win portable"
   },
