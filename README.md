@@ -4,6 +4,18 @@ Windows desktop client for cleaning supported visible Gemini/Veo/Omni watermarks
 
 > Use this only on images and videos you own or have permission to modify.
 
+## 中文介绍
+
+Omni Watermark Cleaner 是一个 Windows 桌面端清理工具，用于处理你拥有或已获授权修改的 AI 生成图片与视频中的可见 Gemini / Veo / Omni 水印。图片处理优先在本机完成，尽量保持原始尺寸、透明通道和画面结构；视频处理会优先使用配置的公开清理页面，低置信度本地兜底默认关闭，避免静默导出质量差的结果。
+
+它面向需要批量整理 AI 素材、制作交付包或在新电脑上使用便携版的用户。项目包含 Electron 客户端、Playwright Chromium、ffmpeg、本地图片水印清理模块、自检清单和便携启动脚本。
+
+## 日本語紹介
+
+Omni Watermark Cleaner は、所有している、または編集許可を得た AI 生成画像・動画に含まれる Gemini / Veo / Omni の可視ウォーターマークを処理する Windows デスクトップツールです。画像処理はできるだけローカルで行い、元のサイズ、アルファチャンネル、画面構造を保持します。動画処理は設定済みの公開クリーニングページを優先し、品質の低いローカルフォールバックは既定では無効です。
+
+AI 素材の整理、納品用ファイルの作成、ポータブル版を別 PC で使う用途に向いています。Electron クライアント、Playwright Chromium、ffmpeg、ローカル画像処理モジュール、自己検証マニフェスト、ポータブル起動スクリプトを含みます。
+
 ## Download And Use
 
 For normal users, download the latest `Omni-Watermark-Cleaner-Portable.zip` from GitHub Releases.
