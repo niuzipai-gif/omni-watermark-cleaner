@@ -1,0 +1,1032 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>豆包水印去除 Lab</title>
+    <style>
+      :root {
+        --bg: #0b1020;
+        --card: #151f3a;
+        --card-soft: #1d2747;
+        --text-main: #edf2ff;
+        --text-muted: #b9c4e6;
+        --accent: #6ea8fe;
+        --accent-soft: #d8e7ff;
+        --danger: #ff6d6d;
+        --ok: #58d39a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Manrope", "Noto Sans SC", "PingFang SC", sans-serif;
+        color: var(--text-main);
+        background:
+          radial-gradient(circle at 0% 0%, rgba(88, 211, 154, 0.16), transparent 48%),
+          radial-gradient(circle at 100% 100%, rgba(110, 168, 254, 0.12), transparent 48%),
+          linear-gradient(180deg, #0a0f1d 0%, #071127 100%);
+      }
+      .page {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 28px 16px 32px;
+      }
+      h1 {
+        margin: 0 0 6px;
+        font-size: 28px;
+        letter-spacing: 0.2px;
+      }
+      .muted {
+        color: var(--text-muted);
+        margin: 0 0 18px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(320px, 360px) minmax(360px, 1fr);
+        gap: 14px;
+      }
+      .card {
+        background: linear-gradient(160deg, var(--card), var(--card-soft));
+        border: 1px solid #2d3a63;
+        border-radius: 14px;
+        padding: 14px;
+        box-shadow: 0 8px 28px rgba(0, 0, 0, 0.27);
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 18px;
+      }
+      .field {
+        margin-bottom: 10px;
+      }
+      label {
+        font-size: 13px;
+        color: var(--text-muted);
+        display: block;
+        margin-bottom: 4px;
+      }
+      input[type="file"],
+      input[type="text"],
+      input[type="password"],
+      textarea,
+      button {
+        width: 100%;
+        border: 1px solid #33426f;
+        border-radius: 10px;
+        background: #101b39;
+        color: var(--text-main);
+        font-size: 13px;
+      }
+      input[type="text"],
+      input[type="password"],
+      textarea {
+        padding: 8px 10px;
+        outline: none;
+      }
+      input[type="text"]:focus,
+      input[type="password"]:focus,
+      textarea:focus {
+        border-color: var(--accent);
+        box-shadow: 0 0 0 2px rgba(110, 168, 254, 0.2);
+      }
+      input[type="file"] {
+        padding: 9px;
+      }
+      textarea {
+        height: 84px;
+        resize: vertical;
+      }
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+      }
+      .row3 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+      }
+      .row4 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1fr;
+        gap: 8px;
+      }
+      button {
+        margin-top: 8px;
+        padding: 10px 12px;
+        border: 1px solid #3e57a4;
+        cursor: pointer;
+        background: linear-gradient(180deg, #2f58bd, #26408a);
+      }
+      button:hover {
+        filter: brightness(1.05);
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .btn-secondary {
+        background: linear-gradient(180deg, #20335c, #16264a);
+      }
+      .btn-danger {
+        background: linear-gradient(180deg, #9f2c3e, #701d2d);
+      }
+      .status {
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--accent-soft);
+        min-height: 38px;
+      }
+      .warn {
+        color: #ffde8f;
+      }
+      .ok {
+        color: var(--ok);
+      }
+      .error {
+        color: var(--danger);
+      }
+      .preview-wrap {
+        display: grid;
+        gap: 10px;
+      }
+      .preview-stage {
+        position: relative;
+        width: 100%;
+        background: #0a1124;
+        border: 1px dashed #39456f;
+        border-radius: 10px;
+        overflow: hidden;
+        min-height: 320px;
+      }
+      .preview-stage canvas {
+        display: block;
+        width: 100%;
+        height: auto;
+      }
+      #previewCanvas,
+      #selectionCanvas {
+        position: absolute;
+        inset: 0;
+      }
+      #selectionCanvas {
+        cursor: crosshair;
+      }
+      .placeholder {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        place-items: center;
+        font-size: 14px;
+        color: var(--text-muted);
+        text-align: center;
+        padding: 0 24px;
+      }
+      .coords {
+        background: #101b38;
+        padding: 9px 10px;
+        border-radius: 10px;
+        border: 1px solid #33446c;
+        font-size: 12px;
+        margin-top: 8px;
+      }
+      .coords span {
+        color: var(--text-muted);
+      }
+      a#downloadLink {
+        display: inline-block;
+        text-decoration: none;
+        color: #08142b;
+        background: #88e3aa;
+        border-radius: 10px;
+        border: 1px solid #3fb57c;
+        padding: 10px 12px;
+        margin-top: 8px;
+        font-weight: 600;
+      }
+      a#downloadLink.disabled {
+        opacity: 0.45;
+        pointer-events: none;
+        background: #4a5576;
+        border-color: #495981;
+      }
+      pre {
+        margin: 10px 0 0;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 12px;
+        color: #c6d4ff;
+        background: #0a1330;
+        border: 1px solid #2d3b65;
+        border-radius: 10px;
+        padding: 10px;
+        max-height: 240px;
+        overflow: auto;
+      }
+      .small {
+        font-size: 12px;
+        color: #91a2d0;
+      }
+      .notice {
+        margin-top: 8px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: #16234a;
+        border: 1px solid #30406d;
+      }
+      .notice p {
+        margin: 0;
+        line-height: 1.45;
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <h1>豆包图片/视频去水印（独立版）</h1>
+      <p class="muted">
+        只处理你新上传的文件。支持图片与视频逐像素修复，支持“拖拽框选”与百分比坐标管理，
+        支持任意分辨率素材；同区域也可直接用于同类素材的精确坐标复用。
+      </p>
+
+      <div class="grid">
+        <section class="card">
+          <h2>1) 输入与检测</h2>
+
+          <div class="field">
+            <label for="mediaInput">选择图片 / 视频</label>
+            <input id="mediaInput" type="file" accept="image/*,video/*" />
+          </div>
+
+          <div class="row">
+            <div class="field">
+              <button id="autoDetectBtn" class="btn-secondary" disabled>自动定位（当前规则）</button>
+            </div>
+            <div class="field">
+              <button id="resetBtn" class="btn-secondary" disabled>清空框选</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>MinMax M3 助手识别（可选）</label>
+            <input id="minmaxEndpoint" type="text" value="https://api.minimaxi.com/v1/chat/completions" />
+            <input id="minmaxApiKey" type="password" placeholder="在此粘贴 MINMAX_API_KEY（仅本机使用）" />
+            <textarea id="minmaxPrompt">请只返回 JSON：{"x":1120,"y":1900,"w":420,"h":210}，表示图片中豆包水印区域（像素）。仅返回JSON，不要解释。</textarea>
+            <button id="minmaxDetectBtn" class="btn-secondary" disabled>调用 MinMax M3</button>
+          </div>
+
+          <div class="notice small">
+            温馨提示：MinMax API Key 不应直接写死到仓库；若发布到线上请改为服务端代理，再在服务端持有 key。
+          </div>
+
+          <h2>2) 精准框选参数（像素）</h2>
+          <div class="row4">
+            <div class="field">
+              <label for="rectX">x</label>
+              <input id="rectX" type="text" value="0" />
+            </div>
+            <div class="field">
+              <label for="rectY">y</label>
+              <input id="rectY" type="text" value="0" />
+            </div>
+            <div class="field">
+              <label for="rectW">w</label>
+              <input id="rectW" type="text" value="0" />
+            </div>
+            <div class="field">
+              <label for="rectH">h</label>
+              <input id="rectH" type="text" value="0" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <button id="applyRectBtn" class="btn-secondary" disabled>应用坐标</button>
+            </div>
+            <div class="field">
+              <button id="runBtn" class="btn-danger" disabled>开始去水印</button>
+            </div>
+          </div>
+
+          <div class="coords">
+            <div><span>原始尺寸：</span><strong id="sourceSize">0 × 0</strong></div>
+            <div><span>显示尺寸：</span><strong id="displaySize">0 × 0</strong></div>
+            <div><span>当前区域：</span><strong id="rectStats">未设置</strong></div>
+          </div>
+
+          <div class="status" id="statusLine">等待上传素材…</div>
+          <div class="small warn">
+            说明：你可以直接在预览图上拖拽框选；拖完后可手动微调像素数值再处理。
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>3) 预览与结果</h2>
+          <div class="preview-wrap">
+            <div class="preview-stage">
+              <canvas id="previewCanvas" width="1" height="1"></canvas>
+              <canvas id="selectionCanvas" width="1" height="1"></canvas>
+              <div id="placeholder" class="placeholder">先选择一张图片或视频，右侧会显示首帧预览。</div>
+            </div>
+            <a id="downloadLink" class="disabled" href="#">处理完成后点击下载</a>
+            <p class="small" id="outputInfo">未处理。</p>
+            <pre id="logPanel"></pre>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <script type="module">
+      const mediaInput = document.getElementById("mediaInput");
+      const previewCanvas = document.getElementById("previewCanvas");
+      const selectionCanvas = document.getElementById("selectionCanvas");
+      const statusLine = document.getElementById("statusLine");
+      const sourceSize = document.getElementById("sourceSize");
+      const displaySize = document.getElementById("displaySize");
+      const rectStats = document.getElementById("rectStats");
+      const runBtn = document.getElementById("runBtn");
+      const resetBtn = document.getElementById("resetBtn");
+      const autoDetectBtn = document.getElementById("autoDetectBtn");
+      const minmaxDetectBtn = document.getElementById("minmaxDetectBtn");
+      const minmaxEndpoint = document.getElementById("minmaxEndpoint");
+      const minmaxApiKey = document.getElementById("minmaxApiKey");
+      const minmaxPrompt = document.getElementById("minmaxPrompt");
+      const rectX = document.getElementById("rectX");
+      const rectY = document.getElementById("rectY");
+      const rectW = document.getElementById("rectW");
+      const rectH = document.getElementById("rectH");
+      const applyRectBtn = document.getElementById("applyRectBtn");
+      const downloadLink = document.getElementById("downloadLink");
+      const outputInfo = document.getElementById("outputInfo");
+      const logPanel = document.getElementById("logPanel");
+      const placeholder = document.getElementById("placeholder");
+
+      const state = {
+        mediaType: null,
+        file: null,
+        sourceObjectUrl: null,
+        naturalWidth: 0,
+        naturalHeight: 0,
+        rect: { x: 0, y: 0, w: 0, h: 0 },
+        dragging: false,
+        dragStart: null,
+        isProcessing: false,
+      };
+
+      const previewCtx = previewCanvas.getContext("2d");
+      const overlayCtx = selectionCanvas.getContext("2d");
+      const logLines = [];
+
+      function log(msg) {
+        const time = new Date().toLocaleTimeString("zh-CN", { hour12: false });
+        logLines.push(`[${time}] ${msg}`);
+        while (logLines.length > 100) logLines.shift();
+        logPanel.textContent = logLines.join("\n");
+      }
+
+      function setStatus(text, type = "ok") {
+        statusLine.className = `status ${type}`;
+        statusLine.textContent = text;
+      }
+
+      function clamp(n, min, max) {
+        return Math.max(min, Math.min(max, n));
+      }
+
+      function disableControls(disabled) {
+        [runBtn, resetBtn, autoDetectBtn, minmaxDetectBtn, applyRectBtn].forEach(
+          (btn) => (btn.disabled = disabled),
+        );
+      }
+
+      function resetInputFields() {
+        rectX.value = "0";
+        rectY.value = "0";
+        rectW.value = "0";
+        rectH.value = "0";
+      }
+
+      function resetOutput() {
+        outputInfo.textContent = "未处理。";
+        downloadLink.classList.add("disabled");
+        downloadLink.removeAttribute("href");
+        downloadLink.textContent = "处理完成后点击下载";
+      }
+
+      function setRect(nx, ny, nw, nh) {
+        const x = clamp(Math.round(nx), 0, Math.max(0, state.naturalWidth - 1));
+        const y = clamp(Math.round(ny), 0, Math.max(0, state.naturalHeight - 1));
+        const w = clamp(Math.round(nw), 0, state.naturalWidth - x);
+        const h = clamp(Math.round(nh), 0, state.naturalHeight - y);
+        state.rect = { x, y, w, h };
+        rectX.value = String(x);
+        rectY.value = String(y);
+        rectW.value = String(w);
+        rectH.value = String(h);
+        redrawRect();
+        updateRectStatus();
+      }
+
+      function updateRectStatus() {
+        const ratioX = state.naturalWidth > 0 ? ((state.rect.x / state.naturalWidth) * 100).toFixed(2) : 0;
+        const ratioY = state.naturalHeight > 0 ? ((state.rect.y / state.naturalHeight) * 100).toFixed(2) : 0;
+        const ratioW = state.naturalWidth > 0 ? ((state.rect.w / state.naturalWidth) * 100).toFixed(2) : 0;
+        const ratioH = state.naturalHeight > 0 ? ((state.rect.h / state.naturalHeight) * 100).toFixed(2) : 0;
+        rectStats.textContent = `${state.rect.w}×${state.rect.h}，坐标 (${state.rect.x},${state.rect.y})，百分比 x:${ratioX}% y:${ratioY}% w:${ratioW}% h:${ratioH}%`;
+      }
+
+      function fitCanvasSize(width, height) {
+        previewCanvas.width = width;
+        previewCanvas.height = height;
+        selectionCanvas.width = width;
+        selectionCanvas.height = height;
+        previewCanvas.style.maxWidth = "100%";
+        selectionCanvas.style.maxWidth = "100%";
+        previewCanvas.style.height = "auto";
+        selectionCanvas.style.height = "auto";
+        const previewRect = previewCanvas.getBoundingClientRect();
+        displaySize.textContent = `${Math.round(previewRect.width)} × ${Math.round(previewRect.height)}（显示）`;
+      }
+
+      function drawPlaceholder(text) {
+        sourceSize.textContent = `${state.naturalWidth || 0} × ${state.naturalHeight || 0}`;
+        displaySize.textContent = "0 × 0（显示）";
+        placeholder.style.display = "grid";
+        placeholder.textContent = text;
+      }
+
+      function drawImageToPreview(imageOrVideo) {
+        fitCanvasSize(state.naturalWidth, state.naturalHeight);
+        previewCtx.setTransform(1, 0, 0, 1, 0, 0);
+        previewCtx.clearRect(0, 0, state.naturalWidth, state.naturalHeight);
+        previewCtx.drawImage(imageOrVideo, 0, 0, state.naturalWidth, state.naturalHeight);
+        placeholder.style.display = "none";
+        redrawRect();
+        sourceSize.textContent = `${state.naturalWidth} × ${state.naturalHeight}`;
+        const previewRect = previewCanvas.getBoundingClientRect();
+        displaySize.textContent = `${Math.round(previewRect.width)} × ${Math.round(previewRect.height)}（显示）`;
+      }
+
+      function redrawRect() {
+        if (!state.naturalWidth || !state.naturalHeight) {
+          overlayCtx.clearRect(0, 0, selectionCanvas.width, selectionCanvas.height);
+          return;
+        }
+        const width = selectionCanvas.width;
+        const height = selectionCanvas.height;
+        overlayCtx.clearRect(0, 0, width, height);
+
+        if (state.rect.w <= 0 || state.rect.h <= 0) return;
+        overlayCtx.save();
+        overlayCtx.strokeStyle = "#6ea8fe";
+        overlayCtx.fillStyle = "rgba(110,168,254,0.16)";
+        overlayCtx.lineWidth = Math.max(2, Math.round(Math.min(width, height) / 400));
+        overlayCtx.setLineDash([6, 4]);
+        overlayCtx.fillRect(state.rect.x, state.rect.y, state.rect.w, state.rect.h);
+        overlayCtx.strokeRect(state.rect.x, state.rect.y, state.rect.w, state.rect.h);
+        overlayCtx.setLineDash([]);
+        overlayCtx.strokeStyle = "#ffd166";
+        overlayCtx.lineWidth = Math.max(1, Math.round(Math.min(width, height) / 700));
+        overlayCtx.strokeRect(
+          state.rect.x + 2,
+          state.rect.y + 2,
+          Math.max(1, state.rect.w - 4),
+          Math.max(1, state.rect.h - 4),
+        );
+        overlayCtx.restore();
+        updateRectStatus();
+      }
+
+      function pointerToNaturalPoint(ev) {
+        const bounds = selectionCanvas.getBoundingClientRect();
+        const xRate = selectionCanvas.width / bounds.width;
+        const yRate = selectionCanvas.height / bounds.height;
+        return {
+          x: clamp(Math.round((ev.clientX - bounds.left) * xRate), 0, state.naturalWidth),
+          y: clamp(Math.round((ev.clientY - bounds.top) * yRate), 0, state.naturalHeight),
+        };
+      }
+
+      function onPointerDown(ev) {
+        if (!state.naturalWidth || state.mediaType === null || state.isProcessing) return;
+        state.dragging = true;
+        const p = pointerToNaturalPoint(ev);
+        state.dragStart = p;
+        setRect(p.x, p.y, 0, 0);
+        selectionCanvas.setPointerCapture(ev.pointerId);
+      }
+
+      function onPointerMove(ev) {
+        if (!state.dragging || !state.dragStart) return;
+        const p = pointerToNaturalPoint(ev);
+        const x = Math.min(state.dragStart.x, p.x);
+        const y = Math.min(state.dragStart.y, p.y);
+        const w = Math.abs(state.dragStart.x - p.x);
+        const h = Math.abs(state.dragStart.y - p.y);
+        setRect(x, y, w, h);
+      }
+
+      function onPointerUp(ev) {
+        if (!state.dragging) return;
+        state.dragging = false;
+        if (ev && state.dragStart) {
+          onPointerMove(ev);
+        }
+        state.dragStart = null;
+        try {
+          selectionCanvas.releasePointerCapture(ev.pointerId);
+        } catch (error) {
+          // ignore
+        }
+      }
+
+      function applyRectFromInputs() {
+        const x = Number(rectX.value);
+        const y = Number(rectY.value);
+        const w = Number(rectW.value);
+        const h = Number(rectH.value);
+        if ([x, y, w, h].some(Number.isNaN)) {
+          setStatus("坐标输入存在非法数字。", "error");
+          return;
+        }
+        setRect(x, y, w, h);
+        setStatus("坐标已更新。");
+      }
+
+      async function loadFile(file) {
+        if (!file) return;
+        if (!file.type.startsWith("image/") && !file.type.startsWith("video/")) {
+          setStatus("仅支持图片或视频文件。", "error");
+          return;
+        }
+
+        if (state.sourceObjectUrl) {
+          URL.revokeObjectURL(state.sourceObjectUrl);
+        }
+        state.file = file;
+        state.sourceObjectUrl = URL.createObjectURL(file);
+        state.mediaType = file.type.startsWith("video/") ? "video" : "image";
+        setStatus(`已选择 ${file.name}`, "ok");
+        log(`加载文件：${file.name} (${file.type || "unknown"})`);
+
+        if (state.mediaType === "image") {
+          await loadImage(file);
+        } else {
+          await loadVideo(file);
+        }
+
+        disableControls(false);
+        resetOutput();
+      }
+
+      async function loadImage(file) {
+        const image = new Image();
+        image.decoding = "sync";
+        image.src = state.sourceObjectUrl;
+        await image.decode();
+        state.naturalWidth = image.naturalWidth;
+        state.naturalHeight = image.naturalHeight;
+        drawImageToPreview(image);
+        applyAutoRectGuess();
+        setStatus(`图片尺寸 ${state.naturalWidth}×${state.naturalHeight}，可直接拖拽修正区域。`);
+      }
+
+      async function loadVideo(file) {
+        const video = document.createElement("video");
+        video.src = state.sourceObjectUrl;
+        video.muted = true;
+        video.playsInline = true;
+        video.preload = "auto";
+
+        await new Promise((resolve, reject) => {
+          video.addEventListener("loadedmetadata", resolve, { once: true });
+          video.addEventListener("error", () => reject(new Error("视频读取失败")), { once: true });
+        });
+        state.naturalWidth = Math.max(1, Math.round(video.videoWidth));
+        state.naturalHeight = Math.max(1, Math.round(video.videoHeight));
+
+        video.currentTime = 0.05;
+        await new Promise((resolve) => {
+          const handle = () => {
+            video.removeEventListener("seeked", handle);
+            resolve();
+          };
+          video.addEventListener("seeked", handle, { once: true });
+        });
+
+        const frameCanvas = document.createElement("canvas");
+        frameCanvas.width = state.naturalWidth;
+        frameCanvas.height = state.naturalHeight;
+        const frameCtx = frameCanvas.getContext("2d");
+        frameCtx.drawImage(video, 0, 0, state.naturalWidth, state.naturalHeight);
+        drawImageToPreview(frameCanvas);
+
+        applyAutoRectGuess();
+        setStatus(`视频尺寸 ${state.naturalWidth}×${state.naturalHeight}，已抽取首帧作为预览。`);
+      }
+
+      function applyAutoRectGuess() {
+        if (!state.naturalWidth || !state.naturalHeight) return;
+        const w = clamp(Math.round(state.naturalWidth * 0.28), 16, state.naturalWidth);
+        const h = clamp(Math.round(state.naturalHeight * 0.12), 16, state.naturalHeight);
+        const x = clamp(Math.round(state.naturalWidth * 0.68), 0, Math.max(0, state.naturalWidth - w));
+        const y = clamp(Math.round(state.naturalHeight * 0.84), 0, Math.max(0, state.naturalHeight - h));
+        setRect(x, y, w, h);
+        setStatus("已按默认规则给出初始区域，建议拖拽微调。");
+      }
+
+      function parseMinmaxRect(rawText) {
+        const normalizeModelContent = (value) => {
+          if (value == null) return "";
+          if (typeof value === "string") return value;
+          if (typeof value === "number" || typeof value === "boolean") return String(value);
+          if (Array.isArray(value)) return value.map((entry) => normalizeModelContent(entry)).join("\n");
+          if (typeof value === "object") {
+            if (typeof value.text === "string") return value.text;
+            if (typeof value.refusal === "string") return value.refusal;
+            if (value.content) return normalizeModelContent(value.content);
+          }
+          return JSON.stringify(value);
+        };
+
+        const cleaned = normalizeModelContent(rawText).replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        let candidate = null;
+
+        try {
+          const parsed = JSON.parse(cleaned);
+          candidate = parsed.rect ?? parsed;
+        } catch {
+          const jsonLike = cleaned.match(/\{[\s\S]*\}/);
+          if (jsonLike) {
+            try {
+              const parsed = JSON.parse(jsonLike[0]);
+              candidate = parsed.rect ?? parsed;
+            } catch {
+              candidate = null;
+            }
+          }
+        }
+
+        if (candidate && ["x", "y", "w", "h"].every((k) => Object.prototype.hasOwnProperty.call(candidate, k))) {
+          const x = Number(candidate.x);
+          const y = Number(candidate.y);
+          const w = Number(candidate.w);
+          const h = Number(candidate.h);
+          if ([x, y, w, h].every(Number.isFinite)) return { x, y, w, h };
+        }
+
+        const kv = cleaned.match(
+          /x\s*[:=]\s*(\d+(?:\.\d+)?)\D+y\s*[:=]\s*(\d+(?:\.\d+)?)\D+w\s*[:=]\s*(\d+(?:\.\d+)?)\D+h\s*[:=]\s*(\d+(?:\.\d+)?)/i,
+        );
+        if (!kv) return null;
+        return {
+          x: Number(kv[1]),
+          y: Number(kv[2]),
+          w: Number(kv[3]),
+          h: Number(kv[4]),
+        };
+      }
+
+      async function detectWithMinmax() {
+        if (!state.naturalWidth || !state.naturalHeight) return;
+        const key = minmaxApiKey.value.trim();
+        const endpoint = minmaxEndpoint.value.trim();
+        if (!key || !endpoint) {
+          setStatus("MinMax 检测需要 API key 和 endpoint。", "error");
+          return;
+        }
+        const dataUrl = previewCanvas.toDataURL("image/png");
+        const payload = {
+          model: "MiniMax-M3",
+          max_completion_tokens: 1200,
+          extra_body: {
+            thinking: { type: "disabled" },
+          },
+          messages: [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "text",
+                  text: `${minmaxPrompt.value.trim()} 返回的是该图片对应的像素坐标。`,
+                },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: dataUrl,
+                    detail: "high",
+                  },
+                },
+              ],
+            },
+          ],
+        };
+
+        setStatus("MinMax M3 请求中…", "warn");
+        try {
+          const response = await fetch(endpoint, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${key}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
+          });
+          if (!response.ok) {
+            const errorBody = await response.text();
+            throw new Error(`HTTP ${response.status}：${errorBody.slice(0, 300)}`);
+          }
+          const body = await response.json();
+          const raw = body?.choices?.[0]?.message?.content ?? "";
+          const parsed = parseMinmaxRect(raw);
+          if (!parsed) throw new Error(`无法解析返回内容: ${String(raw).slice(0, 300)}`);
+
+          let { x, y, w, h } = parsed;
+          if ([x, y, w, h].some((v) => v <= 0)) {
+            throw new Error("返回坐标必须是正数。");
+          }
+          if (w < 1 || h < 1) throw new Error("宽高过小，无法应用。");
+
+          // Allow normalized coordinates from model (0~1). Convert to pixel if needed.
+          if (x <= 1 && y <= 1 && w <= 1 && h <= 1) {
+            x *= state.naturalWidth;
+            y *= state.naturalHeight;
+            w *= state.naturalWidth;
+            h *= state.naturalHeight;
+          }
+          setRect(x, y, w, h);
+          setStatus("MinMax 返回已应用。");
+          log(`MinMax识别成功：x=${Math.round(x)}, y=${Math.round(y)}, w=${Math.round(w)}, h=${Math.round(h)}`);
+        } catch (error) {
+          setStatus(`MinMax 识别失败：${error.message}`, "error");
+          log(`MinMax失败：${error.message}`);
+        }
+      }
+
+      function applyInpaint(imgData, rect, width, height) {
+        const data = imgData.data;
+        const backup = new Uint8ClampedArray(data);
+        const right = rect.x + rect.w;
+        const bottom = rect.y + rect.h;
+        const maxIndex = data.length - 4;
+
+        const pushSample = (sx, sy, acc) => {
+          if (sx < 0 || sx >= width || sy < 0 || sy >= height) return;
+          const si = (sy * width + sx) * 4;
+          if (si < 0 || si >= maxIndex) return;
+          // skip source pixels that are inside watermark area
+          if (sx >= rect.x && sx < right && sy >= rect.y && sy < bottom) return;
+          acc.r += data[si];
+          acc.g += data[si + 1];
+          acc.b += data[si + 2];
+          acc.a += data[si + 3];
+          acc.n += 1;
+        };
+
+        for (let yy = rect.y; yy < bottom; yy += 1) {
+          for (let xx = rect.x; xx < right; xx += 1) {
+            const acc = { r: 0, g: 0, b: 0, a: 0, n: 0 };
+
+            for (let radius = 1; radius <= 8 && acc.n === 0; radius += 1) {
+              for (let dx = -radius; dx <= radius && acc.n === 0; dx += 1) {
+                pushSample(xx + dx, yy - radius, acc);
+              }
+              for (let dx = -radius; dx <= radius && acc.n === 0; dx += 1) {
+                pushSample(xx + dx, yy + radius, acc);
+              }
+              for (let dy = -radius + 1; dy < radius && acc.n === 0; dy += 1) {
+                pushSample(xx - radius, yy + dy, acc);
+              }
+              for (let dy = -radius + 1; dy < radius && acc.n === 0; dy += 1) {
+                pushSample(xx + radius, yy + dy, acc);
+              }
+            }
+
+            if (acc.n === 0) {
+              for (let k = 0; k < 4; k += 1) {
+                backup[(yy * width + xx) * 4 + k] = data[(yy * width + xx) * 4 + k];
+              }
+              continue;
+            }
+
+            const idx = (yy * width + xx) * 4;
+            backup[idx] = Math.round(acc.r / acc.n);
+            backup[idx + 1] = Math.round(acc.g / acc.n);
+            backup[idx + 2] = Math.round(acc.b / acc.n);
+            backup[idx + 3] = Math.round(acc.a / acc.n);
+          }
+        }
+        for (let i = 0; i < data.length; i += 1) {
+          data[i] = backup[i];
+        }
+      }
+
+      async function runImageCleanup() {
+        if (!state.file || state.rect.w <= 0 || state.rect.h <= 0) {
+          setStatus("请先选择去除区域（宽高>0）。", "error");
+          return;
+        }
+        state.isProcessing = true;
+        disableControls(true);
+        setStatus("图片处理中…");
+
+        try {
+          const workCanvas = document.createElement("canvas");
+          workCanvas.width = state.naturalWidth;
+          workCanvas.height = state.naturalHeight;
+          const workCtx = workCanvas.getContext("2d");
+          workCtx.drawImage(previewCanvas, 0, 0, state.naturalWidth, state.naturalHeight);
+
+          const imageData = workCtx.getImageData(0, 0, state.naturalWidth, state.naturalHeight);
+          applyInpaint(imageData, state.rect, state.naturalWidth, state.naturalHeight);
+          workCtx.putImageData(imageData, 0, 0);
+
+          const originalExt = (state.file.name.split(".").pop() || "png").toLowerCase();
+          const extMap = { jpeg: "jpg", jpg: "jpg", png: "png", webp: "webp" };
+          const ext = Object.prototype.hasOwnProperty.call(extMap, originalExt) ? extMap[originalExt] : "png";
+          const mime = ext === "jpg" ? "image/jpeg" : ext === "webp" ? "image/webp" : "image/png";
+          const blob = await new Promise((resolve) => workCanvas.toBlob(resolve, mime, 0.96));
+          if (!blob) throw new Error("图片生成失败。");
+
+          const outputName = `${state.file.name.replace(/\\.[^.]+$/, "")}-doubao-cleaned.${ext}`;
+          const outputUrl = URL.createObjectURL(blob);
+          downloadLink.href = outputUrl;
+          downloadLink.download = outputName;
+          downloadLink.classList.remove("disabled");
+          downloadLink.textContent = `下载 ${outputName}`;
+          outputInfo.textContent = `图片处理完成：${outputName}，尺寸 ${state.naturalWidth}×${state.naturalHeight}`;
+          setStatus("图片处理完成。", "ok");
+          log(`图片处理完成：${outputName}`);
+        } catch (err) {
+          setStatus(`图片处理失败：${err.message}`, "error");
+          log(`图片处理失败：${err.message}`);
+        } finally {
+          state.isProcessing = false;
+          disableControls(false);
+        }
+      }
+
+      function pickRecorderMime() {
+        const supported = [
+          "video/webm;codecs=vp9",
+          "video/webm;codecs=vp8",
+          "video/webm",
+        ];
+        for (const mime of supported) {
+          if (MediaRecorder.isTypeSupported(mime)) {
+            return mime;
+          }
+        }
+        return undefined;
+      }
+
+      async function runVideoCleanup() {
+        if (!state.file || state.rect.w <= 0 || state.rect.h <= 0) {
+          setStatus("请先选择去除区域（宽高>0）。", "error");
+          return;
+        }
+        state.isProcessing = true;
+        disableControls(true);
+        setStatus("视频处理中，按素材长度可能较慢…");
+        log("开始视频逐帧处理");
+
+        try {
+          const video = document.createElement("video");
+          video.src = state.sourceObjectUrl;
+          video.muted = true;
+          video.playsInline = true;
+          video.preload = "auto";
+
+          await new Promise((resolve, reject) => {
+            video.addEventListener("loadedmetadata", resolve, { once: true });
+            video.addEventListener("error", () => reject(new Error("视频读取失败")), { once: true });
+          });
+
+          const workCanvas = document.createElement("canvas");
+          workCanvas.width = state.naturalWidth;
+          workCanvas.height = state.naturalHeight;
+          const workCtx = workCanvas.getContext("2d");
+
+          const baseStream = workCanvas.captureStream(30);
+          const trackStream = video.captureStream?.();
+          if (trackStream && trackStream.getAudioTracks().length > 0) {
+            trackStream.getAudioTracks().forEach((track) => baseStream.addTrack(track));
+          }
+
+          const recorder = new MediaRecorder(baseStream, { mimeType: pickRecorderMime() });
+          const chunks = [];
+          recorder.ondataavailable = (event) => {
+            if (event.data && event.data.size > 0) chunks.push(event.data);
+          };
+
+          const outputPromise = new Promise((resolve, reject) => {
+            recorder.onstop = () => {
+              if (chunks.length === 0) {
+                reject(new Error("未采集到编码片段"));
+                return;
+              }
+              resolve(new Blob(chunks, { type: recorder.mimeType || "video/webm" }));
+            };
+            recorder.onerror = () => reject(new Error("MediaRecorder 运行错误"));
+          });
+
+          let raf = null;
+          let isDone = false;
+          const stopAll = () => {
+            if (isDone) return;
+            isDone = true;
+            try {
+              if (recorder.state === "recording") recorder.stop();
+            } catch {}
+            if (raf !== null) cancelAnimationFrame(raf);
+            video.pause();
+          };
+
+          const render = () => {
+            if (isDone) return;
+            if (video.readyState >= 2) {
+              workCtx.drawImage(video, 0, 0, state.naturalWidth, state.naturalHeight);
+              const frame = workCtx.getImageData(0, 0, state.naturalWidth, state.naturalHeight);
+              applyInpaint(frame, state.rect, state.naturalWidth, state.naturalHeight);
+              workCtx.putImageData(frame, 0, 0);
+            }
+            if (!video.ended) {
+              raf = requestAnimationFrame(render);
+            } else {
+              stopAll();
+            }
+          };
+
+          video.onended = stopAll;
+          video.onpause = () => {
+            if (!isDone && video.currentTime >= video.duration - 0.001) stopAll();
+          };
+
+          recorder.start(200);
+          await video.play().catch((playError) => {
+            throw new Error(`视频播放失败：${playError.message}`);
+          });
+          render();
+
+          const outputBlob = await outputPromise;
+          const outputName = `${state.file.name.replace(/\\.[^.]+$/, "")}-doubao-cleaned.webm`;
+          const outputUrl = URL.createObjectURL(outputBlob);
+          downloadLink.href = outputUrl;
+          downloadLink.download = outputName;
+          downloadLink.classList.remove("disabled");
+          downloadLink.textContent = `下载 ${outputName}`;
+          outputInfo.textContent = `视频处理完成：${outputName}（WebM，无质量损失明显）`;
+          setStatus("视频处理完成。", "ok");
+          log(`视频处理完成：${outputName}`);
+        } catch (error) {
+          setStatus(`视频处理失败：${error.message}`, "error");
+          log(`视频处理失败：${error.message}`);
+        } finally {
+          state.isProcessing = false;
+          disableControls(false);
+        }
+      }
+
+      function onRunClick() {
+        if (state.mediaType === "image") {
+          runImageCleanup();
+        } else if (state.mediaType === "video") {
+          runVideoCleanup();
+        } else {
+          setStatus("请先上传文件。", "error");
+        }
+      }
+
+      mediaInput.addEventListener("change", (event) => {
+        const file = event.target.files?.[0];
+        loadFile(file);
+      });
+      autoDetectBtn.addEventListener("click", applyAutoRectGuess);
+      minmaxDetectBtn.addEventListener("click", detectWithMinmax);
+      applyRectBtn.addEventListener("click", applyRectFromInputs);
+      runBtn.addEventListener("click", onRunClick);
+      resetBtn.addEventListener("click", () => {
+        setRect(0, 0, 0, 0);
+        setStatus("已清空框选。");
+      });
+
+      selectionCanvas.addEventListener("pointerdown", onPointerDown);
+      selectionCanvas.addEventListener("pointermove", onPointerMove);
+      selectionCanvas.addEventListener("pointerup", onPointerUp);
+      selectionCanvas.addEventListener("pointercancel", onPointerUp);
+      selectionCanvas.addEventListener("pointerleave", onPointerUp);
+
+      disableControls(true);
+      resetOutput();
+      drawPlaceholder("先选择一张图片或视频");
+      setStatus("等待上传素材…");
+      log("页面初始化完成。");
+    </script>
+  </body>
+</html>
