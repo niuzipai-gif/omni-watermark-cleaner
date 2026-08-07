@@ -117,15 +117,16 @@ export default function Home() {
     const frameWindow = videoFrameRef.current?.contentWindow;
     const input = frameWindow?.document.getElementById("fileInput") as HTMLInputElement | null;
     if (!input || !frameWindow) return;
+    const frameRealm = frameWindow as unknown as typeof globalThis;
     const bytes = await videoFile.arrayBuffer();
-    const frameFile = new File([bytes], videoFile.name, {
+    const frameFile = new frameRealm.File([bytes], videoFile.name, {
       type: videoFile.type,
       lastModified: videoFile.lastModified,
     });
-    const transfer = new DataTransfer();
+    const transfer = new frameRealm.DataTransfer();
     transfer.items.add(frameFile);
     input.files = transfer.files;
-    input.dispatchEvent(new Event("change", { bubbles: true }));
+    input.dispatchEvent(new frameRealm.Event("change", { bubbles: true }));
     setPhase("ready");
     setMessage("视频已交给本地视频工作区，可在下方检测并导出。");
   }
